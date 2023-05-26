@@ -28,6 +28,10 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* List of processes in THREAD_SLEEP state, that is, processes
+   that are sleep */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -63,6 +67,9 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -92,6 +99,7 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
+
 void
 thread_init (void) {
 	ASSERT (intr_get_level () == INTR_OFF);
@@ -108,6 +116,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -587,4 +596,41 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+void 
+thread_sleep(int64_t ticks) {
+	struct thread *curr = thread_current();
+
+	ASSERT (curr != idle_thread); //if the current thread is not idle thread
+
+	/* When you manipulate thread list, disable interrupt! */
+	enum intr_level old_level = intr_disable ();
+
+	/*change the state of the caller thread to BLOCKED and call schedule()*/
+	thread_block();
+	list_push_back(&sleep_list, &curr->elem);
+
+	/*store the local tick to wake up*/
+	curr->wakeup_tick = ticks;
+
+	intr_set_level (old_level);
+}
+
+void 
+thread_wakeup(int64_t ticks) {
+    struct list_elem *sleep_elem = list_begin(&sleep_list);
+
+    while (sleep_elem != list_end(&sleep_list)) {
+        struct thread *sleep_thread = list_entry(sleep_elem, struct thread, elem);
+        struct list_elem *next_elem = list_next(sleep_elem);
+
+        if (sleep_thread->wakeup_tick <= ticks) {
+            list_remove(sleep_elem);
+            thread_unblock(sleep_thread);
+        }
+
+        sleep_elem = next_elem;
+    }
+	ticks = sleep_elem;
 }
