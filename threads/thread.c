@@ -266,8 +266,7 @@ thread_unblock (struct thread *t) {
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
 	//list_push_back (&ready_list, &t->elem);
-	list_insert_ordered(& ready_list, & t-> elem,
-                       cmp_priority, NULL);
+	list_insert_ordered(&ready_list, & t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -337,15 +336,13 @@ thread_yield (void) {
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void 
-thread_set_priority(int new_priority) {
+void thread_set_priority(int new_priority) {
     struct thread *current_thread = thread_current();
     current_thread->priority = new_priority;
-    
-    /* ready_list를 재정렬합니다. */
+
     if (!list_empty(&ready_list)) {
         struct thread *highest_priority_thread = list_entry(list_front(&ready_list), struct thread, elem);
-        if (new_priority < highest_priority_thread->priority)
+        if (new_priority <= highest_priority_thread->priority)
             thread_yield();
     }
 }
@@ -663,4 +660,15 @@ thread_wakeup(int64_t ticks) {
             sleep_elem = list_next(sleep_elem);
         }
     }
+}
+
+void test_max_priority(void) {
+	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의 우선순위를 비교하여 스케줄링 */
+	if (!list_empty(&ready_list)) {
+		struct thread *top_pri = list_begin(&ready_list);
+		if (cmp_priority(top_pri, &thread_current()->elem, NULL))
+		{
+			thread_yield();
+		}
+	}
 }
