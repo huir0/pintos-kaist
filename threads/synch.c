@@ -235,19 +235,24 @@ lock_acquire(struct lock *lock) {
     struct thread *curr = thread_current();
 	
 
+    curr->wait_on_lock = NULL;
     if (lock->holder) {
         curr->wait_on_lock = lock;
         list_insert_ordered(&lock->holder->donations, &curr->d_elem, cmp_donation_priority, NULL);
-        while (curr->wait_on_lock) {
+        donate_priority();
+    }
+
+    sema_down(&lock->semaphore);
+    lock->holder = thread_current();
+}
+
+void donate_priority(void){
+	struct thread *curr = thread_current();
+	while (curr->wait_on_lock) {
             struct thread *curr_holder = curr->wait_on_lock->holder;
             curr_holder->priority = curr->priority;
             curr = curr_holder;
         }
-    }
-
-    curr->wait_on_lock = NULL;
-    sema_down(&lock->semaphore);
-    lock->holder = thread_current();
 }
 
 
@@ -292,8 +297,16 @@ lock_release(struct lock *lock) {
             curr_elem = list_next(curr_elem);
     }
 
-    if (!list_empty(&curr->donations)) {
-        list_sort(&curr->donations, cmp_donation_priority, NULL);
+    refresh_priority();
+
+    sema_up(&lock->semaphore);
+    lock->holder = NULL;
+}
+
+void refresh_priority(void){
+	struct thread *curr = thread_current();
+	if (!list_empty(&curr->donations)) {
+        list_sort(&curr->donations, &cmp_donation_priority, NULL);
         struct thread *highest_priority_thread = list_entry(list_begin(&curr->donations), struct thread, d_elem);
         if (highest_priority_thread->priority > curr->origin_priority)
             curr->priority = highest_priority_thread->priority;
@@ -302,9 +315,6 @@ lock_release(struct lock *lock) {
     } else {
         curr->priority = curr->origin_priority;
     }
-
-    sema_up(&lock->semaphore);
-    lock->holder = NULL;
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -358,7 +368,7 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
-	list_insert_ordered (&cond->waiters, &waiter.elem,cmp_sem_priority,NULL);
+	list_insert_ordered (&cond->waiters, &waiter.elem, cmp_sem_priority, NULL);
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);

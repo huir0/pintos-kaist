@@ -337,14 +337,9 @@ thread_yield (void) {
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority) {
-    struct thread *current_thread = thread_current();
-    current_thread->priority = new_priority;
-
-    if (!list_empty(&ready_list)) {
-        struct thread *highest_priority_thread = list_entry(list_front(&ready_list), struct thread, elem);
-        if (new_priority <= highest_priority_thread->priority)
-            thread_yield();
-    }
+    thread_current()->origin_priority = new_priority;
+	refresh_priority();
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -637,8 +632,7 @@ thread_sleep(int64_t ticks) {
 
     curr->wakeup_tick = ticks;
     
-	list_insert_ordered(&sleep_list, &curr->elem, cmp_priority, NULL);
-    //list_push_back(&sleep_list, &curr->elem);
+    list_push_back(&sleep_list, &curr->elem);
 	thread_block();
 
     intr_set_level(old_level);
@@ -666,8 +660,7 @@ void test_max_priority(void) {
 	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의 우선순위를 비교하여 스케줄링 */
 	if (!list_empty(&ready_list)) {
 		struct thread *top_pri = list_begin(&ready_list);
-		if (cmp_priority(top_pri, &thread_current()->elem, NULL))
-		{
+		if (cmp_priority(top_pri, &thread_current()->elem, NULL)) {
 			thread_yield();
 		}
 	}
