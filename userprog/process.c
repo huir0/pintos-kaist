@@ -167,21 +167,11 @@ error:
  * Returns -1 on fail. */
 int process_exec(void *f_name)
 {
-	bool success;
 	char *file_name = f_name;
-	char *argv[64];
-	int argc = 0;
-	char **save_ptr;
+	bool success;
+	struct thread *cur = thread_current();
 
-	argv[0] = strtok_r(f_name, " ", &save_ptr);
-
-	while (argv[argc])
-	{
-		argv[++argc] = strtok_r(NULL, " ", &save_ptr);
-	}
-	/* We cannot use the intr_frame in the thread structure.
-	 * This is because when current thread rescheduled,
-	 * it stores the execution information to the member. */
+	// intr_frame 권한설정
 	struct intr_frame _if;
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
@@ -190,20 +180,37 @@ int process_exec(void *f_name)
 	/* We first kill the current context */
 	process_cleanup();
 
+	// for argument parsing
+	char *parse[128];
+	int count = 0;
+
+	char *token;
+	char *save_ptr; // 분리된 문자열 중 남는 부분의 시작주소
+	token = strtok_r(file_name, " ", &save_ptr);
+	while (token != NULL)
+	{
+		parse[count] = token;
+		token = strtok_r(NULL, " ", &save_ptr);
+		count++;
+	}
+
 	/* And then load the binary */
 	success = load(file_name, &_if);
 
-	argument_stack(argv, argc, &_if.rsp);
 	/* If load failed, quit. */
-	palloc_free_page(file_name);
 	if (!success)
+	{
+		palloc_free_page(file_name);
 		return -1;
+	}
 
-	_if.R.rdi = argc;
-	_if.R.rsi = *(uintptr_t **)_if.rsp + 1;
+	argument_stack(parse, count, &_if.rsp);
+	_if.R.rdi = count;
+	_if.R.rsi = _if.rsp + 8;
 
-	/* 디버깅 확인용 */
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	//hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+
+	palloc_free_page(file_name);
 
 	/* Start switched process. */
 	do_iret(&_if);
@@ -212,34 +219,35 @@ int process_exec(void *f_name)
 
 void argument_stack(char **parse, int count, void **rsp)
 {
-	/* argv의 문자열 차례로 저장 */
+	// Save argument strings (character by character)
+	int parse_len;
+	char parse_char;
 	for (int i = count - 1; i >= 0; i--)
 	{
-		for (int j = strlen(parse[i]); j >= 0; j--)
+		parse_len = strlen(parse[i]);
+		for (int j = parse_len; j >= 0; j--)
 		{
-			(*rsp) -= sizeof(char);
-			*(char *)(*rsp) = parse[i][j];
+			parse_char = parse[i][j];
+			(*rsp)--;
+			**(char **)rsp = parse_char; // 1 byte
 		}
+		parse[i] = *(char **)rsp;
 	}
-
-	/* word-align 저장 */
-	*rsp = (void *)(((uintptr_t)(*rsp) - 1) & ~(uintptr_t)7);
-
-	/* argv[argc] 0으로 저장 */
-	(*rsp) -= sizeof(uintptr_t);
-	*(uintptr_t *)(*rsp) = 0;
-
-	/* argv[0] ~ argv[argc-1]의 주소값 저장 */
+	uint64_t pad = (int)*rsp % 8;
+	for (int k = 0; k < pad; k++)
+	{
+		(*rsp)--;
+		**(uint8_t **)rsp = 0;
+	}
+	(*rsp) -= 8;
+	**(char ***)rsp = 0;
 	for (int i = count - 1; i >= 0; i--)
 	{
-		(*rsp) -= sizeof(uintptr_t);
-		*(uintptr_t *)(*rsp) = (uintptr_t)(*rsp) + sizeof(uintptr_t);
-		printf("writing argv on %p\n", *rsp);
+		(*rsp) -= 8;
+		**(char ***)rsp = parse[i];
 	}
-
-	/* return address 저장 */
-	(*rsp) -= sizeof(uintptr_t);
-	*(uintptr_t *)(*rsp) = 0;
+	(*rsp) -= 8;
+	**(void ***)rsp = 0;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
