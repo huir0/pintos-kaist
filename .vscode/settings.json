@@ -1,0 +1,27 @@
+{
+    "files.associations": {
+        "cassert": "c",
+        "optional": "c",
+        "memory": "c",
+        "cstdlib": "c",
+        "locale": "c",
+        "filesys.h": "c",
+        "debug.h": "c",
+        "off_t.h": "c",
+        "file.h": "c",
+        "syscall-nr.h": "c",
+        "process.h": "c",
+        "cstring": "c",
+        "__bit_reference": "c",
+        "__string": "c",
+        "__config": "c",
+        "__threading_support": "c",
+        "malloc.h": "c",
+        "inode.h": "c",
+        "intrinsic.h": "c",
+        "synch.h": "c",
+        "stdbool.h": "c",
+        "*.inc": "c"
+    },
+    "C_Cpp.dimInactiveRegions": false
+}

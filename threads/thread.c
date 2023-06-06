@@ -13,6 +13,7 @@
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "threads/palloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -27,6 +28,10 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+/* List of processes in THREAD_SLEEP state, that is, processes
+   that are sleep */
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -63,6 +68,11 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+void thread_sleep(int64_t ticks);
+void thread_wakeup(int64_t ticks);
+
+
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -92,6 +102,16 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+static bool
+cmp_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority > b->priority;
+}
+
 void
 thread_init (void) {
 	ASSERT (intr_get_level () == INTR_OFF);
@@ -108,6 +128,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -204,9 +225,20 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	t->fdt[0] = palloc_get_page (PAL_ZERO);
+	t->fdt[0] = STDIN_FILENO;
+	t->fdt[1] = STDOUT_FILENO;
+
+	t->next_fd = 2;
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	/* compare the priorities of the currently running 
+	thread and the newly inserted one. Yield the CPU if the
+	newly arriving thread has higher priority*/
+	if(t->priority > thread_get_priority())
+		thread_yield();
 	return tid;
 }
 
@@ -240,7 +272,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	//list_push_back (&ready_list, &t->elem);
+	list_insert_ordered(&ready_list, & t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -303,15 +336,17 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		//list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void
-thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+void thread_set_priority(int new_priority) {
+    thread_current()->origin_priority = new_priority;
+	refresh_priority();
+	test_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -409,6 +444,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	/* Priority initialization */
+	t->origin_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
+
+	t->exit_flag = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -587,4 +629,48 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+void 
+thread_sleep(int64_t ticks) {
+    struct thread *curr = thread_current();
+
+    ASSERT(curr != idle_thread);
+
+    enum intr_level old_level = intr_disable();
+
+    curr->wakeup_tick = ticks;
+    
+    list_push_back(&sleep_list, &curr->elem);
+	thread_block();
+
+    intr_set_level(old_level);
+}
+
+void 
+thread_wakeup(int64_t ticks) {
+    struct list_elem *sleep_elem = list_begin(&sleep_list);
+
+    while (sleep_elem != list_end(&sleep_list)) {
+        struct thread *sleep_thread = list_entry(sleep_elem, struct thread, elem);
+
+        if (sleep_thread->wakeup_tick <= ticks) {
+            struct list_elem *next_elem = list_next(sleep_elem);
+            list_remove(sleep_elem);
+            thread_unblock(sleep_thread);
+            sleep_elem = next_elem;
+        } else {
+            sleep_elem = list_next(sleep_elem);
+        }
+    }
+}
+
+void test_max_priority(void) {
+	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의 우선순위를 비교하여 스케줄링 */
+	if (!list_empty(&ready_list)) {
+		struct thread *top_pri = list_begin(&ready_list);
+		if (cmp_priority(top_pri, &thread_current()->elem, NULL)) {
+			thread_yield();
+		}
+	}
 }
