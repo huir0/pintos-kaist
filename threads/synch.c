@@ -47,6 +47,48 @@ bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void
 
    - up or "V": increment the value (and wake up one waiting
    thread, if any). */
+
+/* One semaphore in a list. */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+
+static bool
+cmp_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority > b->priority;
+}
+
+static bool
+cmp_sem_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
+{
+  const struct semaphore_elem *sa = list_entry(a_, struct semaphore_elem, elem);
+  const struct semaphore_elem *sb = list_entry(b_, struct semaphore_elem, elem);
+  
+  const struct list_elem *lsa = list_begin(&sa->semaphore.waiters);
+  const struct list_elem *lsb = list_begin(&sb->semaphore.waiters);
+
+  const struct thread *tlsa = list_entry(lsa, struct thread, elem);
+  const struct thread *tlsb = list_entry(lsb, struct thread, elem);
+
+  return tlsa->priority > tlsb->priority;
+}
+
+
+static bool
+cmp_donation_priority (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, d_elem);
+  const struct thread *b = list_entry (b_, struct thread, d_elem);
+  
+  return a->priority > b->priority;
+}
+
+
 void
 sema_init (struct semaphore *sema, unsigned value) {
 	ASSERT (sema != NULL);
@@ -121,6 +163,7 @@ sema_up (struct semaphore *sema) {
 	}
 	sema->value++;
 	test_max_priority();
+	test_max_priority();
 	intr_set_level (old_level);
 }
 
@@ -158,7 +201,7 @@ sema_test_helper (void *sema_) {
 		sema_up (&sema[1]);
 	}
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -226,6 +269,7 @@ lock_acquire (struct lock *lock) {
 	// 스레드는 sema_down에서 락을 얻을 때 까지 기다리다가, 락을 점유할 수 있는 상황이 되면 탈출하여 아래 줄을 실행함
 	lock->holder = thread_current();
 }
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
@@ -311,12 +355,7 @@ lock_held_by_current_thread (const struct lock *lock) {
 
 	return lock->holder == thread_current ();
 }
-
-/* One semaphore in a list. */
-struct semaphore_elem {
-	struct list_elem elem;              /* List element. */
-	struct semaphore semaphore;         /* This semaphore. */
-};
+
 
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
