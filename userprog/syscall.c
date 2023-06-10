@@ -20,22 +20,6 @@
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
 void check_address(void *addr);
-void get_argument(void *rsp, int *arg, int count);
-void halt(void);
-void exit(int status);
-pid_t fork(const char *thread_name);
-int exec(const char *cmd_line);
-int wait(pid_t pid);
-bool create(const char *file, unsigned initial_size);
-bool remove(const char *file);
-int open(const char *file);
-int filesize(int fd);
-int read(int fd, void *buffer, unsigned size);
-int write(int fd, const void *buffer, unsigned size);
-void seek(int fd, unsigned position);
-unsigned tell(int fd);
-void close(int fd);
-void check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 
@@ -49,21 +33,20 @@ struct file *process_get_file(int fd);
  * Specific Register (MSR). For the details, see the manual. */
 
 #define MSR_STAR 0xc0000081         /* Segment selector msr */
-#define MSR_LSTAR 0xc0000082      /* Long mode SYSCALL target */
+#define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
-
 
 void syscall_init(void)
 {
    write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
-                     ((uint64_t)SEL_KCSEG) << 32);
+                           ((uint64_t)SEL_KCSEG) << 32);
    write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
 
    /* The interrupt service rountine should not serve any interrupts
     * until the syscall_entry swaps the userland stack to the kernel
     * mode stack. Therefore, we masked the FLAG_FL. */
    write_msr(MSR_SYSCALL_MASK,
-           FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+             FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
    lock_init(&filesys_lock);
 }
 
@@ -81,12 +64,13 @@ void syscall_handler(struct intr_frame *f UNUSED)
    case SYS_EXIT: /* Terminate this process. */
       exit(f->R.rdi);
       break;
-   case SYS_FORK: /* Clone current process. */{
+   case SYS_FORK: /* Clone current process. */
+   {
       struct thread *cur = thread_current();
       memcpy(&cur->tf, f, sizeof(struct intr_frame));
       f->R.rax = fork(f->R.rdi);
       break;
-      }
+   }
    case SYS_EXEC: /* Switch current process. */
       f->R.rax = exec(f->R.rdi);
       break;
@@ -140,10 +124,10 @@ void halt(void)
 */
 void exit(int status)
 {
-   struct thread *cur = thread_current (); 
-    cur->exit_flag = status;
-    printf("%s: exit(%d)\n" ,cur->name, status);
-    thread_exit();
+   struct thread *cur = thread_current();
+   cur->exit_flag = status;
+   printf("%s: exit(%d)\n", cur->name, status);
+   thread_exit();
 }
 /*
 위의 함수는 file(첫 번째 인자)를 이름으로 하고 크기가 initial_size(두 번째 인자)인 새로운 파일을 생성합니다.
@@ -174,7 +158,7 @@ THREAD_NAME이라는 이름을 가진 현재 프로세스의 복제본인 새 �
 pid_t fork(const char *thread_name)
 {
    struct thread *cur = thread_current();
-   return process_fork(thread_name,&cur->tf);
+   return process_fork(thread_name, &cur->tf);
 }
 /*
 현재의 프로세스가 cmd_line에서 이름이 주어지는 실행가능한 프로세스로 변경됩니다. 이때 주어진 인자들을 전달합니다.
@@ -185,12 +169,13 @@ int exec(const char *cmd_line)
    char *fn_copy;
    tid_t tid;
 
-   fn_copy = palloc_get_page (PAL_ZERO);
+   fn_copy = palloc_get_page(PAL_ZERO);
    if (fn_copy == NULL)
       return TID_ERROR;
-   strlcpy (fn_copy, cmd_line, PGSIZE);
+   strlcpy(fn_copy, cmd_line, PGSIZE);
    tid = process_exec(fn_copy);
-   if(tid == -1){
+   if (tid == -1)
+   {
       return -1;
    }
    palloc_free_page(fn_copy);
@@ -203,7 +188,6 @@ int exec(const char *cmd_line)
 */
 int wait(pid_t pid)
 {
-   // return 81;
    return process_wait(pid);
 }
 /*
@@ -213,12 +197,16 @@ file(첫 번째 인자)이라는 이름을 가진 파일을 엽니다. 해당 �
 int open(const char *file)
 {
    check_address(file);
+   lock_acquire(&filesys_lock);
    struct file *open_file = filesys_open(file);
-   if(open_file == NULL){
+   lock_release(&filesys_lock);
+   if (open_file == NULL)
+   {
       return -1;
    }
    int fd = process_add_file(open_file);
-   if(fd == -1){
+   if (fd == -1)
+   {
       file_close(open_file);
    }
    return fd;
@@ -230,7 +218,7 @@ int filesize(int fd)
 {
 
    struct file *find_file = process_get_file(fd);
-   if(find_file == NULL)
+   if (find_file == NULL)
       return -1;
    return file_length(find_file);
 }
@@ -242,36 +230,36 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 int read(int fd, void *buffer, unsigned size)
 {
    check_address(buffer);
-    int file_size;
-    char *read_buffer = buffer;
-    if (fd == 0)
-    {
-        char key;
-        for (file_size = 0; file_size < size; file_size++)
-        {
-            key = input_getc();
-            *read_buffer++ = key;
-            if (key == '\0')
-            {
-                break;
-            }
-        }
-    }
-    else if (fd == 1)
-    {
-        return -1;
-    }
-    else
-    {
-        struct file *read_file = process_get_file(fd);
-        if (read_file == NULL)
-        {
-            return -1;
-        }
-        lock_acquire(&filesys_lock);
+   int file_size;
+   char *read_buffer = buffer;
+   if (fd == STDIN_FILENO)
+   {
+      char key;
+      for (file_size = 0; file_size < size; file_size++)
+      {
+         key = input_getc();
+         *read_buffer++ = key;
+         if (key == '\0')
+         {
+            break;
+         }
+      }
+   }
+   else if (fd == STDOUT_FILENO)
+   {
+      return -1;
+   }
+   else
+   {
+      struct file *read_file = process_get_file(fd);
+      if (read_file == NULL)
+      {
+         return -1;
+      }
+      lock_acquire(&filesys_lock);
       file_size = file_read(read_file, buffer, size);
       lock_release(&filesys_lock);
-    }
+   }
    return file_size;
 }
 /*
@@ -282,15 +270,17 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 int write(int fd, const void *buffer, unsigned size)
 {
    int file_size;
-   if (fd == STDOUT_FILENO)
+   if (fd == STDIN_FILENO)
+   {
+      return -1;
+   }
+   else if (fd == STDOUT_FILENO)
    {
       putbuf(buffer, size);
       file_size = size;
    }
-   else if(fd == STDIN_FILENO){
-      return -1;
-   }
-   else{
+   else
+   {
       lock_acquire(&filesys_lock);
       file_size = file_write(process_get_file(fd), buffer, size);
       lock_release(&filesys_lock);
@@ -308,12 +298,10 @@ void seek(int fd, unsigned position)
    /*
    Changes the next byte to be read or written in open file fd to position.
    Use void file_seek(struct file *file, off_t new_pos).
-   */   
+   */
    struct file *seek_file = process_get_file(fd);
-   if(fd <= 2){
-      return;
-   }
-   return file_seek(seek_file,position);
+   if (fd > 1)
+      file_seek(seek_file, position);
 }
 /*
 열려진 파일 fd에서 읽히거나 써질 다음 바이트의 위치를 반환합니다.
@@ -321,10 +309,11 @@ void seek(int fd, unsigned position)
 */
 unsigned tell(int fd)
 {
-   //Use off_t file_tell(struct file *file).
+   // Use off_t file_tell(struct file *file).
    struct file *tell_file = process_get_file(fd);
    return file_tell(tell_file);
 }
+
 /*
 파일 식별자 fd를 닫습니다. 프로세스를 나가거나 종료하는 것은 묵시적으로 그 프로세스의 열려있는 파일 식별자들을 닫습니다.
 마치 각 파일 식별자에 대해 이 함수가 호출된 것과 같습니다.
@@ -332,12 +321,14 @@ unsigned tell(int fd)
 void close(int fd)
 {
    struct file *close_file = process_get_file(fd);
-   if(close_file == NULL){
+   if (close_file == NULL)
+   {
       return -1;
    }
    process_close_file(fd);
    return file_close(close_file);
 }
+
 /*
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
@@ -345,7 +336,7 @@ void close(int fd)
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4,addr) == NULL)
+   if (is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL || addr == NULL)
    {
       exit(-1);
    }

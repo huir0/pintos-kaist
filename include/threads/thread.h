@@ -103,7 +103,7 @@ struct thread {
    struct lock *wait_on_lock;          // 해당 쓰레드가 대기하고 있는 lock자료구조의 주소를 저장할 필드
    struct list list_donation;          // multiple donation을 고려하기 위한 리스트
    struct list_elem d_elem;           // 해당 리스트를 위한 elem도 추가
-   struct file **fdt;            // 파일 디스크립터 테이블
+   struct file *fdt[64];            // 파일 디스크립터 테이블
    int next_fd;                  // 테이블 중 비어있는 곳 
    struct list child_list;          // 자식 스레드 리스트
    struct list_elem child_elem;       // 자식 스레드 리스트를 위한 elem
