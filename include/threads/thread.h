@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -108,12 +109,16 @@ struct thread {
    struct list_elem child_elem;       // 자식 스레드 리스트를 위한 elem
 
    struct thread *parent;            // 부모 스레드
-
-   struct semaphore *child_sema;      // 자식 스레드의 종료를 대기하기 위한 세마포어
+   struct intr_frame parent_if;
+   struct semaphore load_sema;
+   struct semaphore exit_sema;
+   struct semaphore free_sema;
    
    int exit_flag;                  // 스레드 종료 확인을 위한 플래그
+   int exit_status;
+   int load_flag;                  
    
-   
+   struct file *running_file;
 
    // NOTE: For Advanced Scheduler 
    int nice;
