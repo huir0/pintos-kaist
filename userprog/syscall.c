@@ -4,20 +4,11 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
-#include "threads/palloc.h"
 #include "threads/loader.h"
 #include "userprog/gdt.h"
 #include "threads/init.h"
-#include "threads/init.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
-#include "filesys/filesys.h"
-#include "user/syscall.h"
-#include "threads/vaddr.h"
-#include "threads/synch.h"
-#include "filesys/file.h"
-#include "userprog/process.h"
-#include <string.h>
 #include "filesys/filesys.h"
 #include "user/syscall.h"
 #include "threads/vaddr.h"
@@ -29,10 +20,21 @@
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
 void check_address(void *addr);
-int process_add_file(struct file *f);
-struct file *process_get_file(int fd);
-void syscall_entry(void);
-void syscall_handler(struct intr_frame *);
+void get_argument(void *rsp, int *arg, int count);
+void halt(void);
+void exit(int status);
+pid_t fork(const char *thread_name);
+int exec(const char *cmd_line);
+int wait(pid_t pid);
+bool create(const char *file, unsigned initial_size);
+bool remove(const char *file);
+int open(const char *file);
+int filesize(int fd);
+int read(int fd, void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
+void seek(int fd, unsigned position);
+unsigned tell(int fd);
+void close(int fd);
 void check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
@@ -55,18 +57,7 @@ void syscall_init(void)
    write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
                            ((uint64_t)SEL_KCSEG) << 32);
    write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
-void syscall_init(void)
-{
-   write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
-                           ((uint64_t)SEL_KCSEG) << 32);
-   write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
 
-   /* The interrupt service rountine should not serve any interrupts
-    * until the syscall_entry swaps the userland stack to the kernel
-    * mode stack. Therefore, we masked the FLAG_FL. */
-   write_msr(MSR_SYSCALL_MASK,
-             FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-   lock_init(&filesys_lock);
    /* The interrupt service rountine should not serve any interrupts
     * until the syscall_entry swaps the userland stack to the kernel
     * mode stack. Therefore, we masked the FLAG_FL. */
@@ -213,6 +204,7 @@ int exec(const char *cmd_line)
 */
 int wait(pid_t pid)
 {
+   // return 81;
    return process_wait(pid);
 }
 /*
@@ -222,9 +214,8 @@ file(첫 번째 인자)이라는 이름을 가진 파일을 엽니다. 해당 �
 int open(const char *file)
 {
    check_address(file);
-   lock_acquire(&filesys_lock);
    struct file *open_file = filesys_open(file);
-   lock_release(&filesys_lock);
+
    if (open_file == NULL)
    {
       return -1;
@@ -257,7 +248,7 @@ int read(int fd, void *buffer, unsigned size)
    check_address(buffer);
    int file_size;
    char *read_buffer = buffer;
-   if (fd == STDIN_FILENO)
+   if (fd == 0)
    {
       char key;
       for (file_size = 0; file_size < size; file_size++)
@@ -270,7 +261,7 @@ int read(int fd, void *buffer, unsigned size)
          }
       }
    }
-   else if (fd == STDOUT_FILENO)
+   else if (fd == 1)
    {
       return -1;
    }
@@ -295,14 +286,14 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 int write(int fd, const void *buffer, unsigned size)
 {
    int file_size;
-   if (fd == STDIN_FILENO)
-   {
-      return -1;
-   }
-   else if (fd == STDOUT_FILENO)
+   if (fd == STDOUT_FILENO)
    {
       putbuf(buffer, size);
       file_size = size;
+   }
+   else if (fd == STDIN_FILENO)
+   {
+      return -1;
    }
    else
    {
@@ -325,8 +316,11 @@ void seek(int fd, unsigned position)
    Use void file_seek(struct file *file, off_t new_pos).
    */
    struct file *seek_file = process_get_file(fd);
-   if (fd > 1)
-      file_seek(seek_file, position);
+   if (fd < 2)
+   {
+      return;
+   }
+   return file_seek(seek_file, position);
 }
 /*
 열려진 파일 fd에서 읽히거나 써질 다음 바이트의 위치를 반환합니다.
@@ -338,7 +332,6 @@ unsigned tell(int fd)
    struct file *tell_file = process_get_file(fd);
    return file_tell(tell_file);
 }
-
 /*
 파일 식별자 fd를 닫습니다. 프로세스를 나가거나 종료하는 것은 묵시적으로 그 프로세스의 열려있는 파일 식별자들을 닫습니다.
 마치 각 파일 식별자에 대해 이 함수가 호출된 것과 같습니다.
@@ -353,7 +346,6 @@ void close(int fd)
    process_close_file(fd);
    return file_close(close_file);
 }
-
 /*
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
@@ -361,19 +353,7 @@ void close(int fd)
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL || addr == NULL)
-   {
-      exit(-1);
-   }
-}
-/*
-주소 값이 유저 영역 주소 값인지 확인
-유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
-*/
-void check_address(void *addr)
-{
-   struct thread *curr = thread_current();
-   if (is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL || addr == NULL)
+   if (is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
    {
       exit(-1);
    }
