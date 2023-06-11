@@ -71,6 +71,8 @@ void syscall_handler(struct intr_frame *f UNUSED)
 {
    // TODO: Your implementation goes here.
    check_address(f->rsp);
+   struct thread *cur = thread_current();
+   memcpy(&cur->tf, f, sizeof(struct intr_frame));
    int syscall_num = f->R.rax;
    switch (syscall_num)
    {
@@ -81,12 +83,8 @@ void syscall_handler(struct intr_frame *f UNUSED)
       exit(f->R.rdi);
       break;
    case SYS_FORK: /* Clone current process. */
-   {
-      struct thread *cur = thread_current();
-      memcpy(&cur->tf, f, sizeof(struct intr_frame));
       f->R.rax = fork(f->R.rdi);
       break;
-   }
    case SYS_EXEC: /* Switch current process. */
       f->R.rax = exec(f->R.rdi);
       break;
@@ -215,7 +213,6 @@ int open(const char *file)
 {
    check_address(file);
    struct file *open_file = filesys_open(file);
-
    if (open_file == NULL)
    {
       return -1;
@@ -353,7 +350,7 @@ void close(int fd)
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
+   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
    {
       exit(-1);
    }

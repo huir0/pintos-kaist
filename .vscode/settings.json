@@ -1,5 +1,13 @@
 {
     "files.associations": {
-        "syscall.h": "c"
+        "syscall.h": "c",
+        "atomic": "c",
+        "cstring": "c",
+        "__string": "c",
+        "memory": "c",
+        "__threading_support": "c",
+        "thread": "c",
+        "__mutex_base": "c",
+        "*.inc": "c"
     }
 }

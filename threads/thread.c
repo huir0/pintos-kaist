@@ -198,8 +198,8 @@ tid_t thread_create(const char *name, int priority,
    init_thread(t, name, priority); /* thread 구조체 초기화*/
    tid = t->tid = allocate_tid();  /* tid 할당 */
 
-   struct file **new_fdt = (struct file **)palloc_get_page(PAL_ZERO);
-   *t->fdt = new_fdt;
+   struct file **new_fdt = (struct file **)palloc_get_multiple(PAL_ZERO, 3);
+   t->fdt = new_fdt;
 
    /* Call the kernel_thread if it scheduled.
     * Note) rdi is 1st argument, and rsi is 2nd argument. */
