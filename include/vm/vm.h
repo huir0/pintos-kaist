@@ -79,7 +79,7 @@ struct page_operations {
 #define swap_in(page, v) (page)->operations->swap_in ((page), v)
 #define swap_out(page) (page)->operations->swap_out (page)
 #define destroy(page) \
-	if ((page)->operations->destroy) (page)->operations->destroy (page)
+	if ((page)->operations->destroy) (page)->operations->destroy (page)	//page 객체의 operations 구조체의 destroy 멤버를 호출
 
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
