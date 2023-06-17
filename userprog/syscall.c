@@ -19,7 +19,11 @@
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
+#ifndef VM
+struct page *check_address(void *addr);
+#else
 void check_address(void *addr);
+#endif
 void get_argument(void *rsp, int *arg, int count);
 void halt(void);
 void exit(int status);
@@ -35,7 +39,6 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
-void check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 
@@ -70,10 +73,10 @@ void syscall_init(void)
 void syscall_handler(struct intr_frame *f UNUSED)
 {
    // TODO: Your implementation goes here.
-   check_address(f->rsp);
    struct thread *cur = thread_current();
    memcpy(&cur->tf, f, sizeof(struct intr_frame));
    int syscall_num = f->R.rax;
+   check_address(f->rsp);
    switch (syscall_num)
    {
    case SYS_HALT: /* Halt the operating system. */
@@ -243,6 +246,7 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 int read(int fd, void *buffer, unsigned size)
 {
    check_address(buffer);
+   check_address(buffer+1);
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -347,6 +351,18 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
+#ifndef VM
+struct page * check_address(void *addr)
+{
+   struct thread *curr = thread_current();
+   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr))
+   {
+      exit(-1);
+   }
+   // struct page *page = spt_find_page(&curr->spt, addr);
+   // if (page != NULL) return page;
+}
+#else
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
@@ -355,3 +371,4 @@ void check_address(void *addr)
       exit(-1);
    }
 }
+#endif
