@@ -19,7 +19,7 @@
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-#ifndef VM
+#ifdef VM
 struct page *check_address(void *addr);
 #else
 void check_address(void *addr);
@@ -76,7 +76,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
    struct thread *cur = thread_current();
    memcpy(&cur->tf, f, sizeof(struct intr_frame));
    int syscall_num = f->R.rax;
-   check_address(f->rsp);
+   
    switch (syscall_num)
    {
    case SYS_HALT: /* Halt the operating system. */
@@ -183,6 +183,7 @@ pid_t fork(const char *thread_name)
 */
 int exec(const char *cmd_line)
 {
+   check_address(cmd_line);
    char *fn_copy;
    tid_t tid;
 
@@ -286,6 +287,7 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
+   check_address(buffer);
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -351,16 +353,16 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
-#ifndef VM
+#ifdef VM
 struct page * check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr))
+   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr)|| pml4_get_page(curr->pml4, addr) == NULL)
    {
       exit(-1);
    }
-   // struct page *page = spt_find_page(&curr->spt, addr);
-   // if (page != NULL) return page;
+   struct page *page = spt_find_page(&curr->spt, addr);
+   if (page != NULL) return page;
 }
 #else
 void check_address(void *addr)

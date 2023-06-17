@@ -7,6 +7,7 @@
 #include "include/threads/vaddr.h"
 #include "threads/mmu.h"
 #include "include/userprog/process.h"
+#include "lib/string.h"
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -89,13 +90,11 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	e = hash_find(&spt->hash, &page.elem);
 	if (e) return hash_entry(e, struct page, elem);
 	else return NULL;
-
 }
 
 /* Insert PAGE into spt with validation. */
 bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
+spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
 	// if(hash_insert(spt->hash, &page->elem))
@@ -106,7 +105,7 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
-	// hash_delete(spt->hash, &page->elem);
+	hash_delete(&spt->hash, &page->elem);
 	// vm_dealloc_page (page);
 	return true;
 }
@@ -116,7 +115,8 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-	
+	victim = vm_get_frame();
+
 	return victim;
 }
 
@@ -126,7 +126,7 @@ static struct frame *
 vm_evict_frame (void) {
 	struct frame *victim UNUSED = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-	// swap_out(victim->page);
+	swap_out(victim->page);
 	return NULL;
 }
 
@@ -138,7 +138,7 @@ static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
-	frame = malloc(sizeof(struct frame));	
+	frame = malloc(sizeof(struct frame));
 	frame->kva = palloc_get_page(PAL_USER);
 	if (frame->kva == NULL){
 		// frame->page = NULL;
@@ -183,17 +183,14 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: Your code goes here */
 	if (is_kernel_vaddr(addr)) return false;
 	if (addr > f->rsp) return false;
-	// uintptr_t distance = (uintptr_t) f->rsp > (uintptr_t) addr ? (uintptr_t) f->rsp - (uintptr_t) addr : (uintptr_t) addr - (uintptr_t) f->rsp;
-	// if (distance > USER_STACK) return false;
-
+	uintptr_t distance = (uintptr_t) f->rsp > (uintptr_t) addr ? (uintptr_t) f->rsp - (uintptr_t) addr : (uintptr_t) addr - (uintptr_t) f->rsp;
+	if (distance > USER_STACK) return false;
+	
+	if (!spt_find_page(spt, addr)) return false;
 	if (not_present) {
-		// page = malloc(sizeof(struct page));	
 		return vm_claim_page(addr);
 	}
-	// else {
-	// }
-	// if (page = spt_find_page(spt, addr))
-	// 	return vm_do_claim_page(page);
+
 	return false;
 }
 /* Free the page.
@@ -225,17 +222,16 @@ vm_do_claim_page (struct page *page) {
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	if (pml4_get_page(thread_current()->pml4, page->va) == NULL && pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable));
 	return swap_in(page, frame->kva);
-	// return true;
 	return false;
 }
 
 
-uint64_t hash_hash_func_ (const struct hash_elem *e, void *aux) {
+static unsigned hash_hash_func_ (const struct hash_elem *e, void *aux) {
 // 해시 값을 구해주는 함수
 	struct page *page_ = hash_entry(e, struct page, elem);
 	return hash_int(page_->va);
 }
-bool hash_less_func_ (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+static bool hash_less_func_ (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
 //해시 element 들의 크기를 비교해주는 함수
 	struct page *a_page = hash_entry(a, struct page, elem);
 	struct page *b_page = hash_entry(b, struct page, elem);
@@ -243,9 +239,8 @@ bool hash_less_func_ (const struct hash_elem *a, const struct hash_elem *b, void
 }
 
 void hash_action_func_ (struct hash_elem *e, void *aux) {
-	// struct page *page = hash_entry(e, struct page, elem);
-	// palloc_free_page(page);
-	// vm_dealloc_page(page);
+	struct page *page = hash_entry(e, struct page, elem);
+	vm_dealloc_page(page);
 }
  
 /* Initialize new supplemental page table */
@@ -256,14 +251,47 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct supplemental_page_table *src UNUSED) {
+// Copies the supplemental page table from src to dst. 
+// This is used when a child needs to inherit the execution context of its parent (i.e. fork()). 
+// Iterate through each page in the src's supplemental page table and make a exact copy of the entry in the dst's supplemental page table. 
+// You will need to allocate uninit page and claim them immediately.
+	struct hash_iterator i;
+	hash_first (&i, &src->hash);
+	while (hash_next (&i)) {
+		struct page *page = hash_entry (hash_cur (&i), struct page, elem);
+
+
+
+		vm_alloc_page(page_get_type(page), page->va, page->writable);
+		struct page *new_page = spt_find_page(dst, page->va);
+		new_page->va = page->va;
+		new_page->writable = page->writable;
+		vm_claim_page(new_page->va);
+		memcpy(new_page->frame->kva, page->frame->kva, PGSIZE);
+
+	}
+	return true;
 }
 
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
-	/* TODO: Destroy all the supplemental_page_table hold by thread and
-	 * TODO: writeback all the modified contents to the storage. */
-	// hash_destroy(&spt->hash, hash_action_func_);
+/* TODO: Destroy all the supplemental_page_table hold by thread and
+	* TODO: writeback all the modified contents to the storage. */
+/* Frees all the resources that were held by a supplemental page table. 
+This function is called when a process exits (process_exit() in userprog/process.c). 
+You need to iterate through the page entries and call destroy(page) for the pages in the table. 
+You do not need to worry about the actual page table (pml4) and the physical memory (palloc-ed memory) in this function; 
+the caller cleans them after the supplemental page table is cleaned up. */
+	// struct hash_iterator i;
+	// hash_first (&i, &spt->hash);
+	// while (hash_next (&i)) {
+	// 	struct page *page = hash_entry (hash_cur (&i), struct page, elem);
+	// 	// hash_delete(&spt->hash,hash_cur(&i));
+	// 	spt_remove_page(spt, page);
+	// 	vm_dealloc_page(page);
+	// }
+
+	// hash_destroy(&spt->hash, hash_delete);
 }

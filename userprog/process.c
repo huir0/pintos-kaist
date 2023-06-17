@@ -862,16 +862,13 @@ setup_stack(struct intr_frame *if_)
    커맨드 라인의 인자들과 함께 할당하고 초기화 할 수 있습니다. 당신은 스택을 확인하는 방법을 제공해야 합니다. 
    당신은 vm/vm.h의 vm_type에 있는 보조 marker(예 - VM_MARKER_0)들을 페이지를 마킹하는데 사용할 수 있습니다. */
 
-   success = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
+   success = vm_alloc_page(VM_STACK, stack_bottom, true);
    if (success) {
       success = vm_claim_page(stack_bottom);
       if (success) 
          if_->rsp = USER_STACK;
    }  
-   // if(!vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true)) return false;
-   // if(!vm_claim_page(stack_bottom)) return false;
-   // if_->rsp =  USER_STACK;
-   // return true;
+
    return success;
 }
 #endif /* VM */

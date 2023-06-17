@@ -60,7 +60,6 @@ struct page {
 	size_t zero_bytes;
 	size_t swap_slot;
 	struct hash_elem elem;
-	// struct hash_elem h_elem;
 	bool writable;
 
 	/* Per-type data are binded into the union.
@@ -92,7 +91,6 @@ struct page_operations {
 	enum vm_type type;
 };
 
-// v는 버퍼의 주소
 #define swap_in(page, v) (page)->operations->swap_in ((page), v) 
 #define swap_out(page) (page)->operations->swap_out (page)
 #define destroy(page) \
@@ -125,7 +123,7 @@ void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 void vm_init (void);
 bool vm_try_handle_fault (struct intr_frame *f, void *addr, bool user,
 		bool write, bool not_present);
-
+static struct frame * vm_get_frame (void);
 #define vm_alloc_page(type, upage, writable) \
 	vm_alloc_page_with_initializer ((type), (upage), (writable), NULL, NULL)
 bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
