@@ -76,7 +76,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
    struct thread *cur = thread_current();
    memcpy(&cur->tf, f, sizeof(struct intr_frame));
    int syscall_num = f->R.rax;
-   
+   check_address(f->rsp);
    switch (syscall_num)
    {
    case SYS_HALT: /* Halt the operating system. */
@@ -206,7 +206,6 @@ int exec(const char *cmd_line)
 */
 int wait(pid_t pid)
 {
-   // return 81;
    return process_wait(pid);
 }
 /*
@@ -246,8 +245,7 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 */
 int read(int fd, void *buffer, unsigned size)
 {
-   check_address(buffer);
-   check_address(buffer+1);
+   check_valid_buffer(buffer, size, true);
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -287,7 +285,7 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
-   check_address(buffer);
+   check_valid_buffer(buffer, size, false);
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -296,7 +294,7 @@ int write(int fd, const void *buffer, unsigned size)
    }
    else if (fd == STDIN_FILENO)
    {
-      return -1;
+      exit(-1);
    }
    else
    {
@@ -357,13 +355,29 @@ void close(int fd)
 struct page * check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr)|| pml4_get_page(curr->pml4, addr) == NULL)
-   {
-      exit(-1);
-   }
    struct page *page = spt_find_page(&curr->spt, addr);
-   if (page != NULL) return page;
+   if (!addr || is_kernel_vaddr(addr) ||!page)
+   {
+      return NULL;
+   }
+   return page;
 }
+
+void check_valid_buffer(void *buffer, unsigned size, bool to_write)
+{
+   for (unsigned int i = 0; i <= size; i++)
+   {
+      struct page *page = check_address(buffer + i);
+      if(page == NULL){
+         exit(-1);
+      }
+      if(to_write == false && page->writable == false){
+         exit(-1);
+      }
+   }
+}
+
+
 #else
 void check_address(void *addr)
 {

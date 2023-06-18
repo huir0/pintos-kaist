@@ -243,6 +243,9 @@ int process_exec(void *f_name)
    /* We first kill the current context */
    process_cleanup();
 
+#ifdef VM
+	supplemental_page_table_init(&cur->spt);
+#endif
    // for argument parsing
    char *parse[64];
    int count = 0;
@@ -316,9 +319,9 @@ int process_add_file(struct file *f)
    struct thread *cur = thread_current();
 
    // 파일 객체(struct file)를 가리키는 포인터를 File Descriptor 테이블에 추가
-   lock_acquire(&filesys_lock);
+
    cur->fdt[cur->next_fd] = f;
-   lock_release(&filesys_lock);
+
    // 다음 File Descriptor 값 1 증가
    cur->next_fd++;
    // 추가된 파일 객체의 File Descriptor 반환
@@ -376,8 +379,10 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
    struct thread *cur = thread_current();
-   for (int i = 2; i < 64; i++)
+	for (int i = FD_MIN; i < FD_MAX; i++)
       close(i);
+	palloc_free_multiple(cur->fdt, 3);
+	cur->fdt = NULL;
    file_close(cur->running_file);
    sema_up(&cur->exit_sema);
    sema_down(&cur->free_sema);
@@ -770,14 +775,11 @@ lazy_load_segment(struct page *page, void *aux)
    이 함수는 페이지 구조체와 aux를 인자로 받습니다. aux는 load_segment에서 당신이 설정하는 정보입니다. 
    이 정보를 사용하여 당신은 세그먼트를 읽을 파일을 찾고 최종적으로는 세그먼트를 메모리에서 읽어야 합니다.*/
    struct segment *seg = (struct segment *) aux;
-   // if (file_read_at(seg->file_, page->va, seg->read_bytes, seg->ofs) != (int) seg->read_bytes)
-   //    return false;
-   // memset(page->va + seg->read_bytes, 0, seg->zero_bytes);
-   if (file_read_at(seg->file_, page->frame->kva, seg->read_bytes, seg->ofs) != (int) seg->read_bytes)
+   
+   if (file_read_at(seg->file_, page->frame->kva, seg->read_bytes, seg->ofs) != (int) seg->read_bytes) {
+         palloc_free_page(page->frame->kva);
       return false;
-   // file_seek(seg->file_, seg->ofs);
-   // if (file_read(seg->file_, page->frame->kva, seg->read_bytes) != seg->read_bytes)
-   //    return false;
+   }
    memset(page->frame->kva + seg->read_bytes, 0, seg->zero_bytes);
    return true;
 }
@@ -812,18 +814,15 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes, 
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* TODO: Set up aux to pass information to the lazy_load_segment. */
-      void *aux = NULL;
+
       struct segment *seg = (struct segment*)malloc(sizeof(struct segment));
-      // seg = (struct segment *)aux;
       seg->file_ = file;
       seg->ofs = ofs;
       seg->read_bytes = page_read_bytes;
-      seg->upage = upage;
       seg->zero_bytes = page_zero_bytes;
-      seg->writable = writable;
-
-      if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, seg)){
-         // free(seg);
+      
+      void *aux = seg;
+      if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux)){
          return false;
       }
       /* userprog/process.c에 있는 load_segment와 lazy_load_segment를 구현하세요. 
@@ -862,11 +861,11 @@ setup_stack(struct intr_frame *if_)
    커맨드 라인의 인자들과 함께 할당하고 초기화 할 수 있습니다. 당신은 스택을 확인하는 방법을 제공해야 합니다. 
    당신은 vm/vm.h의 vm_type에 있는 보조 marker(예 - VM_MARKER_0)들을 페이지를 마킹하는데 사용할 수 있습니다. */
 
-   success = vm_alloc_page(VM_STACK, stack_bottom, true);
+   success = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
    if (success) {
       success = vm_claim_page(stack_bottom);
       if (success) 
-         if_->rsp = USER_STACK;
+         if_->rsp = (uintptr_t)USER_STACK;
    }  
 
    return success;

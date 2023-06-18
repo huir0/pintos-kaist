@@ -78,6 +78,7 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem f_elem;
 };
 
 /* The function table for page operations.
@@ -106,8 +107,8 @@ struct supplemental_page_table {
 	가장 중요하게는, 페이지 폴트가 발생했을 때 그곳에 어떤 데이터가 있었어야 했는지를 알아내기 위해 
 	커널은 보조 페이지 테이블에서 폴트가 발생한 가상 페이지를 탐색합니다. 
 	두번째로는 커널이 프로세스가 종료될 때 어떤 자원을 해제(free)할지 고르기 위해서 보조 페이지 테이블을 조사합니다.*/
-	// struct hash hash;	
 	struct hash hash;	
+	// struct hash vm;	
 };
 
 #include "threads/thread.h"
@@ -123,7 +124,7 @@ void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 void vm_init (void);
 bool vm_try_handle_fault (struct intr_frame *f, void *addr, bool user,
 		bool write, bool not_present);
-static struct frame * vm_get_frame (void);
+
 #define vm_alloc_page(type, upage, writable) \
 	vm_alloc_page_with_initializer ((type), (upage), (writable), NULL, NULL)
 bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
