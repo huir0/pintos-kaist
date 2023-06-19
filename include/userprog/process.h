@@ -13,5 +13,12 @@ int process_add_file (struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 void remove_child_process(struct thread *cp);
-
+struct lazy{
+	struct file *file_;
+	off_t offset;
+	uint8_t *upage;
+	size_t read_bytes; 
+	size_t zero_bytes; 
+	bool writable;
+};
 #endif /* userprog/process.h */
