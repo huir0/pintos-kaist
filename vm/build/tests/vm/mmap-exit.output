@@ -22,8 +22,8 @@ Executing 'mmap-exit':
 (mmap-exit) wait for child (should return 0): FAILED
 mmap-exit: exit(1)
 Execution of 'mmap-exit' complete.
-Timer: 66 ticks
-Thread: 30 idle ticks, 32 kernel ticks, 5 user ticks
+Timer: 65 ticks
+Thread: 30 idle ticks, 29 kernel ticks, 6 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 224 reads, 472 writes
 hd1:0: 210 reads, 0 writes

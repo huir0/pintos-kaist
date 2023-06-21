@@ -14,23 +14,15 @@ Boot complete.
 Putting 'pt-write-code' into the file system...
 Executing 'pt-write-code':
 (pt-write-code) begin
-pt-write-code: dying due to interrupt 0x0d (#GP General Protection Exception).
-Interrupt 0x0d (#GP General Protection Exception) at rip=4000f6
- cr2=00000000004000e8 error=               0
-rax 00000000004000e8 rbx 0000800424321000 rcx 00000000000000ff rdx 0000000000000000
-rsp 000000004747ff90 rbp 000000004747ff90 rsi 000000000060508e rdi 000000000060517f
-rip 00000000004000f6 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
-r11 0000000000000206 r12 0000010424300000 r13 0000800424300000 r14 00008004229df800
-r15 00008004243ef000 rflags 00000212
-es: 001b ds: 001b cs: 0023 ss: 001b
+pt-write-code: exit(-1)
 Execution of 'pt-write-code' complete.
-Timer: 114 ticks
-Thread: 30 idle ticks, 26 kernel ticks, 58 user ticks
+Timer: 58 ticks
+Thread: 30 idle ticks, 27 kernel ticks, 1 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 80 reads, 232 writes
 hd1:0: 102 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1534 characters output
+Console: 960 characters output
 Keyboard: 0 keys pressed
-Exception: 0 page faults
+Exception: 1 page faults
 Powering off...

@@ -155,6 +155,11 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	if(vm_alloc_page(VM_ANON, pg_round_down(addr), true))	{
+		thread_current()->stack_bottom -= PGSIZE;
+		return true;
+	}
+	return false;
 }
 
 /* Handle the fault on write_protected page */
@@ -181,14 +186,19 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	if (is_kernel_vaddr(addr)||!addr) return false;
-	
-	// uintptr_t distance = (uintptr_t) f->rsp > (uintptr_t) addr ? (uintptr_t) f->rsp - (uintptr_t) addr : (uintptr_t) addr - (uintptr_t) f->rsp;
-	// if (distance > USER_STACK) return false;
-	struct page *page = spt_find_page(spt, addr);
-	if (page == NULL) return false;
-	if (vm_do_claim_page(page))
-		return true;
+	if (is_kernel_vaddr(addr)||!addr||!not_present) return false;
+	if (not_present){
+		// 커널이면 thread구조체의 rsp_stack을, 유저면 interrupt frame의 rsp를 사용함
+		void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
+		/* 유저 스택영역에 접근하는 경우임, 0x100000 = 2^20 = 1MB 
+			rsp_stack과 한개의 페이지 크기 8사이의 주소에서 page_fault가 났는지, 주소가 유저스택의
+			최대 최소 영역 안에 있는지 */
+		if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK ) vm_stack_growth(addr);
+		struct page *page = spt_find_page(spt, addr);
+		if (page == NULL) return false;
+		if (write == 1 && !page->writable) return false;
+		return vm_do_claim_page (page);
+    }
 	return false;
 }
 /* Free the page.

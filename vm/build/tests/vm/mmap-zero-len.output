@@ -18,8 +18,8 @@ Executing 'mmap-zero-len':
 (mmap-zero-len) open "sample.txt"
 (mmap-zero-len) try to mmap zero length
 Execution of 'mmap-zero-len' complete.
-Timer: 60 ticks
-Thread: 30 idle ticks, 28 kernel ticks, 2 user ticks
+Timer: 61 ticks
+Thread: 30 idle ticks, 28 kernel ticks, 3 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 115 reads, 254 writes
 hd1:0: 106 reads, 0 writes

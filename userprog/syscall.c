@@ -361,15 +361,9 @@ void close(int fd)
 #ifdef VM
 struct page *check_address(void *addr)
 {
-   if (is_kernel_vaddr(addr) || !addr)
-   {
-      exit(-1);
-   }
+   if (is_kernel_vaddr(addr) || !addr) exit(-1);
    struct page *page = spt_find_page(&thread_current()->spt, addr);
-   if (!page)
-   {
-      exit(-1);
-   }
+   if (!page) exit(-1);
    return page;
 }
 void check_valid_buffer(void *buffer, unsigned size, bool to_write)
@@ -377,10 +371,7 @@ void check_valid_buffer(void *buffer, unsigned size, bool to_write)
    for (unsigned int i = 0; i <= size; i++)
    {
       struct page *page = check_address(buffer + i);
-   
-      if(to_write == false && page->writable == false){
-         exit(-1);
-      }
+      if(to_write == true && page->writable == false) exit(-1);
    }
 }
 
@@ -388,9 +379,6 @@ void check_valid_buffer(void *buffer, unsigned size, bool to_write)
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
-   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
-   {
-      exit(-1);
-   }
+   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL) exit(-1);
 }
 #endif

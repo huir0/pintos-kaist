@@ -30,18 +30,18 @@ child-swap: exit(0)
 (child-swap) begin
 child-swap: exit(0)
 (child-swap) begin
-(child-swap) begin
 child-swap: exit(0)
+(child-swap) begin
 child-swap: exit(0)
 (child-swap) begin
 child-swap: exit(0)
 (swap-fork) end
 swap-fork: exit(0)
 Execution of 'swap-fork' complete.
-Timer: 283 ticks
-Thread: 30 idle ticks, 139 kernel ticks, 114 user ticks
+Timer: 280 ticks
+Thread: 30 idle ticks, 136 kernel ticks, 114 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 1042 reads, 8276 writes
+hd0:1: 1043 reads, 8276 writes
 hd1:0: 4119 reads, 0 writes
 hd1:1: 0 reads, 0 writes
 Console: 1410 characters output

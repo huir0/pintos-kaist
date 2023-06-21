@@ -22,7 +22,7 @@ Executing 'lazy-file':
 (lazy-file) mmap "small.txt"
 Execution of 'lazy-file' complete.
 Timer: 62 ticks
-Thread: 30 idle ticks, 31 kernel ticks, 2 user ticks
+Thread: 30 idle ticks, 30 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 147 reads, 350 writes
 hd1:0: 151 reads, 0 writes

@@ -18,8 +18,8 @@ Executing 'mmap-clean':
 (mmap-clean) open "sample.txt"
 (mmap-clean) mmap "sample.txt"
 Execution of 'mmap-clean' complete.
-Timer: 59 ticks
-Thread: 30 idle ticks, 27 kernel ticks, 2 user ticks
+Timer: 60 ticks
+Thread: 30 idle ticks, 28 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 115 reads, 262 writes
 hd1:0: 112 reads, 0 writes
