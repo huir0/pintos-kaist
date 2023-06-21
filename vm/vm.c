@@ -240,7 +240,12 @@ static bool hash_less_func_ (const struct hash_elem *a, const struct hash_elem *
 
 	return v_a->va < v_b->va;
 }
-
+static void
+hash_alloc_func(struct hash_elem *he, void *aux){
+	struct page *page = hash_entry(he,struct page,h_elem);
+	if(page -> files != NULL) vm_dealloc_page(page);
+}
+ 
 void hash_action_func_ (struct hash_elem *e, void *aux) {
 	struct page *page = hash_entry(e, struct page, h_elem);
 	vm_dealloc_page(page);
@@ -251,7 +256,6 @@ void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 	hash_init(&spt->spt_hash, hash_hash_func_, hash_less_func_, NULL);
 }
-
 /* Copy supplemental page table from src to dst */
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct supplemental_page_table *src UNUSED) {
@@ -259,7 +263,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct
 이것은 자식이 부모의 실행 context를 상속할 필요가 있을 때 사용됩니다.(예 - fork()). 
 src의 supplemental page table를 반복하면서 dst의 supplemental page table의 엔트리의 정확한 복사본을 만드세요. 
 당신은 초기화되지않은(uninit) 페이지를 할당하고 그것들을 바로 요청할 필요가 있을 것입니다.*/
-
 /* 해당 함수는 부모 프로세스가 가지고 있는 본인의 SPT 정보를 빠짐없이 자식 프로세스에게 복사해주는 기능을 수행합니다.(fork 시스템 콜)
 우선 해시테이블을 통해 구현한 SPT를 iteration해줘야 합니다.이를 구현하기 위한 방법을 hash.c 파일에서 제공합니다.저희 팀의 경우 간단히 while문을 통해 iter해주는 방식을 택하였습니다.
 이후 iter를 돌 때마다 해당 hash_elem과 연결된 page를 찾아서 해당 페이지 구조체의 정보들을 저장합니다.
@@ -267,7 +270,31 @@ src의 supplemental page table를 반복하면서 dst의 supplemental page table
 부모 페이지들의 정보를 저장한 뒤,자식이 가질 새로운 페이지를 생성해야합니다.생성을 위해 부모 페이지의 타입을 먼저 검사합니다.즉,부모 페이지가UNINIT 페이지인 경우와 그렇지 않은 경우를 나누어 페이지를 생성해줘야합니다.
 만약 uninit이 아닌 경우 setup_stack()함수에서 했던 것처럼 페이지를 생성한뒤 바로 해당 페이지의 타입에 맞는 initializer를 호출해 페이지 타입을 변경시켜줍니다.그리고 나서 부모페이지의 물리 메모리 정보를 자식에게도 복사해주어야 합니다.
 모든 함수 호출이 정상적으로 이루어졌다면 return true를 하며 함수를 종료합니다.*/
-	
+	struct hash_iterator h_iter;
+	struct page *p_page;
+	bool success = false;
+	hash_first(&h_iter, &src->spt_hash);// 초기 반복자를 src 해시 테이블의 첫 번째 원소로 설정
+
+	// 해시 테이블의 다음 원소가 있을 때까지 반복
+	while (hash_next(&h_iter))
+	{	
+		// 현재 해시 테이블 원소를 가져온 후 struct page로 변환
+		p_page = hash_entry(hash_cur(&h_iter), struct page, h_elem);
+		// 페이지를 할당하고 초기화
+		success = vm_alloc_page_with_initializer(p_page->uninit.type, p_page->va, p_page->writable, p_page->uninit.init, p_page->uninit.aux);
+		if (!success) return false;	 // 할당에 실패한 경우 false 반환
+		struct page *c_page = spt_find_page(dst, p_page->va);	// 복사할 페이지 (c_page) 찾기
+		if (p_page->frame)	  	// 원본 페이지에 frame이 있는 경우
+		{
+			// c_page에 대한 메모리를 할당하고 초기화
+       		success = vm_do_claim_page(c_page);
+        	if (!success) return false;            // 초기화에 실패한 경우 false 반환
+
+        	// 원본 페이지와 복사 페이지의 메모리 간에 데이터를 복사
+        	memcpy(c_page->frame->kva, p_page->frame->kva, PGSIZE);
+		}
+	}	
+	return success;
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -279,6 +306,11 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 이 함수는 process가 exit할 때(userprog/process.c의 process_exit()) 호출됩니다. 
 당신은 페이지 엔트리를 반복하면서 테이블의 페이지에 destroy(page)를 호출하여야 합니다. 
 당신은 이 함수에서 실제 페이지 테이블(pml4)와 물리 주소(palloc된 메모리)에 대해 걱정할 필요가 없습니다. 
-supplemental page table이 정리되어지고 나서, 호출자가 그것들을 정리할 것입니다. */
-	
+supplemental page table이 정리되어지고 나서, 호출자가 그것들을 정리할 것입니다. 
+깃북에 적힌것처럼 해당 함수는 존재하는 SPT를 모두 free()하며 할당 해제해주는 함수입니다.
+저희는 간단한게 hash.c 파일에 존재하는 hash_destroy() 함수만 사용했습니다.
+해당 함수를 사용하려면 두번째 인자로 넘어가는 aux에 대응하는 함수를 하나 만들어야합니다.
+만들어야하는 함수의 경우 hash_elem을 인자로 받기에 elem을 통해 page를 찾고 해당 페이지를 할당 해제해주는 로직을 구현했습니다.
+추후 memory-mapped 부분을 진행할때,해당 함수를 추가적으로 수정할 예정입니다*/
+	hash_destroy(&spt->spt_hash,hash_alloc_func);
 }

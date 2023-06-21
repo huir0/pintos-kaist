@@ -16,17 +16,20 @@ Putting 'sample.txt' into the file system...
 Executing 'fork-close':
 (fork-close) begin
 (fork-close) open "sample.txt"
+(fork-close) child run
+(fork-close) end
+child: exit(0)
 (fork-close) Parent success
 (fork-close) end
 fork-close: exit(0)
 Execution of 'fork-close' complete.
-Timer: 60 ticks
-Thread: 30 idle ticks, 27 kernel ticks, 3 user ticks
+Timer: 62 ticks
+Thread: 30 idle ticks, 28 kernel ticks, 4 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 122 reads, 258 writes
+hd0:1: 162 reads, 258 writes
 hd1:0: 110 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1075 characters output
+Console: 1130 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

@@ -1,6 +1,5 @@
 source ./activate
 make clean
-clear
 cd vm
 make check
 sleep 2

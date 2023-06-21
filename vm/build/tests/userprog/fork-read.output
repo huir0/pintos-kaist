@@ -16,17 +16,21 @@ Putting 'sample.txt' into the file system...
 Executing 'fork-read':
 (fork-read) begin
 (fork-read) open "sample.txt"
+(fork-read) child run
+(fork-read) Child: pintos is funny!
+(fork-read) end
+child: exit(0)
 (fork-read) Parent success
 (fork-read) end
 fork-read: exit(0)
 Execution of 'fork-read' complete.
-Timer: 60 ticks
-Thread: 30 idle ticks, 27 kernel ticks, 3 user ticks
+Timer: 63 ticks
+Thread: 30 idle ticks, 29 kernel ticks, 4 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 116 reads, 260 writes
+hd0:1: 159 reads, 260 writes
 hd1:0: 111 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1065 characters output
+Console: 1154 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

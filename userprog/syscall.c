@@ -371,11 +371,7 @@ struct page *check_address(void *addr)
       exit(-1);
    }
    return page;
-#else
-   if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL) exit(-1);
-#endif
 }
-#ifdef VM
 void check_valid_buffer(void *buffer, unsigned size, bool to_write)
 {
    for (unsigned int i = 0; i <= size; i++)

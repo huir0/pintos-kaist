@@ -18,8 +18,8 @@ Executing 'mmap-write':
 (mmap-write) open "sample.txt"
 (mmap-write) mmap "sample.txt"
 Execution of 'mmap-write' complete.
-Timer: 60 ticks
-Thread: 30 idle ticks, 28 kernel ticks, 2 user ticks
+Timer: 61 ticks
+Thread: 30 idle ticks, 28 kernel ticks, 3 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 116 reads, 256 writes
 hd1:0: 107 reads, 0 writes
