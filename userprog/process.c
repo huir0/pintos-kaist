@@ -22,6 +22,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
+#define VM
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -242,7 +243,9 @@ int process_exec(void *f_name)
 
    /* We first kill the current context */
    process_cleanup();
-
+   #ifdef VM
+   supplemental_page_table_init(&cur->spt);
+   #endif
    // for argument parsing
    char *parse[64];
    int count = 0;
@@ -764,6 +767,14 @@ lazy_load_segment(struct page *page, void *aux)
    /* TODO: Load the segment from the file */
    /* TODO: This called when the first page fault occurs on address VA. */
    /* TODO: VA is available when calling this function. */
+   struct segment *seg = aux;
+   struct frame *frame = page->frame;
+   if(file_read_at(seg->file, frame->kva, seg->read_bytes, seg->ofs) != (int)seg->read_bytes) {
+      palloc_free_page(frame->kva);
+      return false;
+   }
+   memset(frame->kva + seg->read_bytes, 0, seg->zero_bytes);
+   return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -798,6 +809,12 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 
       /* TODO: Set up aux to pass information to the lazy_load_segment. */
       void *aux = NULL;
+      struct segment *seg = (struct segment *)malloc(sizeof(struct segment));
+      seg->file = file;
+      seg->ofs = ofs;
+      seg->read_bytes = page_read_bytes;
+      seg->zero_bytes = page_zero_bytes;
+      aux = seg;
       if (!vm_alloc_page_with_initializer(VM_ANON, upage,
                                           writable, lazy_load_segment, aux))
          return false;
@@ -805,6 +822,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      ofs = page_read_bytes;
       upage += PGSIZE;
    }
    return true;
@@ -821,6 +839,13 @@ setup_stack(struct intr_frame *if_)
     * TODO: If success, set the rsp accordingly.
     * TODO: You should mark the page is stack. */
    /* TODO: Your code goes here */
+   success = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
+   if(success) {
+      success = vm_claim_page(stack_bottom);
+      if(success) {
+         if_->rsp = (uintptr_t)USER_STACK;
+      }
+   }
 
    return success;
 }

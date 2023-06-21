@@ -39,6 +39,10 @@ void check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
 
+#ifdef VM
+struct page *check_page_address(void *addr);
+void check_valid_buffer(void *buffer, unsigned size, bool to_write);
+#endif
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -242,7 +246,7 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 */
 int read(int fd, void *buffer, unsigned size)
 {
-   check_address(buffer);
+   check_valid_buffer(buffer, size, true);
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -282,6 +286,7 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
+   check_valid_buffer(buffer, size, false);
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -347,6 +352,29 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
+#ifdef VM
+struct page *check_page_address(void *addr) {
+   struct thread *cur = thread_current();
+   struct page *page = spt_find_page(&cur->spt, addr);
+   if(!page || is_kernel_vaddr(addr) || !addr) {
+      return NULL;
+   }
+   return page;
+}
+
+void check_valid_buffer(void *buffer, unsigned size, bool to_write) {
+   for (unsigned int i = 0; i <= size; i++)
+   {
+      struct page *page = check_page_address(buffer + i);
+      if(page == NULL){
+         exit(-1);
+      }
+      if(to_write == false && page->writable == false){
+         exit(-1);
+      }
+   }
+}
+#endif
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();
