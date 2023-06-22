@@ -119,7 +119,7 @@ struct thread
    int exit_flag; // 스레드 종료 확인을 위한 플래그
 
    struct file *running_file;
-
+   // void *stack_bottom_;
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
 

@@ -244,7 +244,7 @@ int process_exec(void *f_name)
    process_cleanup();
 
 #ifdef VM
-	supplemental_page_table_init(&cur->spt);
+   supplemental_page_table_init(&cur->spt);
 #endif
    // for argument parsing
    char *parse[64];
@@ -379,11 +379,14 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
    struct thread *cur = thread_current();
-	for (int i = FD_MIN; i < FD_MAX; i++)
+   for (int i = FD_MIN; i < FD_MAX; i++)
       close(i);
-	palloc_free_multiple(cur->fdt, 3);
-	cur->fdt = NULL;
+   palloc_free_multiple(cur->fdt, 3);
+   cur->fdt = NULL;
    file_close(cur->running_file);
+#ifdef VM
+   supplemental_page_table_kill(&cur->spt);
+#endif
    sema_up(&cur->exit_sema);
    sema_down(&cur->free_sema);
    process_cleanup(); // pml4를 날림(이 함수를 call 한 thread의 pml4)
@@ -395,9 +398,7 @@ process_cleanup(void)
 {
    struct thread *curr = thread_current();
 
-#ifdef VM
-   supplemental_page_table_kill(&curr->spt);
-#endif
+
 
    uint64_t *pml4;
    /* Destroy the current process's page directory and switch back
@@ -454,7 +455,7 @@ struct ELF64_hdr
 {
    unsigned char e_ident[EI_NIDENT];
    uint16_t e_type;
-   uint16_t e_machine;  
+   uint16_t e_machine;
    uint32_t e_version;
    uint64_t e_entry;
    uint64_t e_phoff;
@@ -763,21 +764,23 @@ install_page(void *upage, void *kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-bool
-lazy_load_segment(struct page *page, void *aux)
+bool lazy_load_segment(struct page *page, void *aux)
 {
    /* TODO: Load the segment from the file */
    /* TODO: This called when the first page fault occurs on address VA. */
-   /* TODO: VA is available when calling this function. 
-   당신은 load_segment 함수 내부의 vm_alloc_page_with_initialize의 
+   /* TODO: VA is available when calling this function.
+   당신은 load_segment 함수 내부의 vm_alloc_page_with_initialize의
    네 번째 인자가 lazy_load_segment 라는 것을 알아차렸을 것입니다.
-   이 함수는 실행 가능한 파일의 페이지들을 초기화하는 함수이고 page fault가 발생할 때 호출됩니다. 
-   이 함수는 페이지 구조체와 aux를 인자로 받습니다. aux는 load_segment에서 당신이 설정하는 정보입니다. 
+   이 함수는 실행 가능한 파일의 페이지들을 초기화하는 함수이고 page fault가 발생할 때 호출됩니다.
+   이 함수는 페이지 구조체와 aux를 인자로 받습니다. aux는 load_segment에서 당신이 설정하는 정보입니다.
    이 정보를 사용하여 당신은 세그먼트를 읽을 파일을 찾고 최종적으로는 세그먼트를 메모리에서 읽어야 합니다.*/
-   struct segment *seg = (struct segment *) aux;
-   
-   if (file_read_at(seg->file_, page->frame->kva, seg->read_bytes, seg->ofs) != (int) seg->read_bytes) {
-         palloc_free_page(page->frame->kva);
+   struct segment *seg = (struct segment *)aux;
+   page->_file = seg->file_;
+   page->offset = seg->ofs;
+   page->read_bytes = seg->read_bytes;
+   if (file_read_at(seg->file_, page->frame->kva, seg->read_bytes, seg->ofs) != (int)seg->read_bytes)
+   {
+      palloc_free_page(page->frame->kva);
       return false;
    }
    memset(page->frame->kva + seg->read_bytes, 0, seg->zero_bytes);
@@ -815,32 +818,33 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes, 
 
       /* TODO: Set up aux to pass information to the lazy_load_segment. */
 
-      struct segment *seg = (struct segment*)malloc(sizeof(struct segment));
+      struct segment *seg = (struct segment *)malloc(sizeof(struct segment));
+
       seg->file_ = file;
       seg->ofs = ofs;
       seg->read_bytes = page_read_bytes;
       seg->zero_bytes = page_zero_bytes;
-      
+
       void *aux = seg;
-      if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux)){
+      if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux))
+      {
          return false;
       }
-      /* userprog/process.c에 있는 load_segment와 lazy_load_segment를 구현하세요. 
-      실행파일로부터 세그먼트가 로드되는 것을 구현하세요. 이러한 모든 페이지들은 지연적으로 로드될 것입니다. 
+      /* userprog/process.c에 있는 load_segment와 lazy_load_segment를 구현하세요.
+      실행파일로부터 세그먼트가 로드되는 것을 구현하세요. 이러한 모든 페이지들은 지연적으로 로드될 것입니다.
       즉 이 페이지들에 발생한 page fault를 커널이 다루게 된다는 의미입니다.
-      당신은 program loader의 핵심인 userprog/process.c 의 load_segment loop 내부를 수정해야 합니다. 
-      루프를 돌 때마다 load_segment는 대기 중인 페이지 오브젝트를 생성하는 vm_alloc_page_with_initializer를 
+      당신은 program loader의 핵심인 userprog/process.c 의 load_segment loop 내부를 수정해야 합니다.
+      루프를 돌 때마다 load_segment는 대기 중인 페이지 오브젝트를 생성하는 vm_alloc_page_with_initializer를
       호출합니다. Page Fault가 발생하는 순간은 Segment가 실제로 파일에서 로드될 때 입니다.
-      현재 코드는 메인 루프 안에서 파일로부터 읽을 바이트의 수와 0으로 채워야 할 바이트의 수를 측정합니다. 
-      그리고 그것은 대기 중인 오브젝트를 생성하는 vm_alloc_page_with_initializer함수를 호출합니다. 
-      당신은 vm_alloc_page_with_initializer에 제공할 aux 인자로써 보조 값들을 설정할 필요가 있습니다. 
+      현재 코드는 메인 루프 안에서 파일로부터 읽을 바이트의 수와 0으로 채워야 할 바이트의 수를 측정합니다.
+      그리고 그것은 대기 중인 오브젝트를 생성하는 vm_alloc_page_with_initializer함수를 호출합니다.
+      당신은 vm_alloc_page_with_initializer에 제공할 aux 인자로써 보조 값들을 설정할 필요가 있습니다.
       당신은 바이너리 파일을 로드할 때 필수적인 정보를 포함하는 구조체를 생성하는 것이 좋습니다. */
-
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      ofs += page_read_bytes; // HY
+      ofs += page_read_bytes;
       upage += PGSIZE;
    }
    return true;
@@ -856,18 +860,18 @@ setup_stack(struct intr_frame *if_)
    /* TODO: Map the stack on stack_bottom and claim the page immediately.
     * If success, set the rsp accordingly.
     * You should mark the page is stack. */
-   /* 첫 스택 페이지는 지연적으로 할당될 필요가 없습니다. 
-   당신은 페이지 폴트가 발생하는 것을 기다릴 필요 없이 그것(스택 페이지)을 load time 때 
-   커맨드 라인의 인자들과 함께 할당하고 초기화 할 수 있습니다. 당신은 스택을 확인하는 방법을 제공해야 합니다. 
+   /* 첫 스택 페이지는 지연적으로 할당될 필요가 없습니다.
+   당신은 페이지 폴트가 발생하는 것을 기다릴 필요 없이 그것(스택 페이지)을 load time 때
+   커맨드 라인의 인자들과 함께 할당하고 초기화 할 수 있습니다. 당신은 스택을 확인하는 방법을 제공해야 합니다.
    당신은 vm/vm.h의 vm_type에 있는 보조 marker(예 - VM_MARKER_0)들을 페이지를 마킹하는데 사용할 수 있습니다. */
 
-   success = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
-   if (success) {
+   success = vm_alloc_page(VM_STACK, stack_bottom, true);
+   if (success)
+   {
       success = vm_claim_page(stack_bottom);
-      if (success) 
+      if (success)
          if_->rsp = (uintptr_t)USER_STACK;
-   }  
-
+   }
    return success;
 }
 #endif /* VM */

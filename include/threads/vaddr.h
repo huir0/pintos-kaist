@@ -19,7 +19,8 @@
 #define PGBITS  12                         /* Number of offset bits. */
 #define PGSIZE  (1 << PGBITS)              /* Bytes in a page. */
 #define PGMASK  BITMASK(PGSHIFT, PGBITS)   /* Page offset bits (0:12). */
-
+#define MAX_STACK_PAGES 256
+#define STACK_MAX USER_STACK - (PGSIZE * MAX_STACK_PAGES)
 /* Offset within a page. */
 #define pg_ofs(va) ((uint64_t) (va) & PGMASK)
 

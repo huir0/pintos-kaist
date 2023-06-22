@@ -16,14 +16,12 @@
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include <string.h>
+#include "lib/limits.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-#ifdef VM
 struct page *check_address(void *addr);
-#else
-void check_address(void *addr);
-#endif
+void check_address_not_vm(void *addr);
 void get_argument(void *rsp, int *arg, int count);
 void halt(void);
 void exit(int status);
@@ -75,9 +73,8 @@ void syscall_handler(struct intr_frame *f UNUSED)
    // TODO: Your implementation goes here.
    struct thread *cur = thread_current();
    memcpy(&cur->tf, f, sizeof(struct intr_frame));
-   int syscall_num = f->R.rax;
    check_address(f->rsp);
-   switch (syscall_num)
+   switch (f->R.rax)
    {
    case SYS_HALT: /* Halt the operating system. */
       halt();
@@ -120,6 +117,12 @@ void syscall_handler(struct intr_frame *f UNUSED)
       break;
    case SYS_CLOSE: /* Close a file. */
       close(f->R.rdi);
+      break;
+   case SYS_MMAP:
+      f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+      break;
+   case SYS_MUNMAP:
+      munmap(f->R.rdi);
       break;
    default:
       thread_exit();
@@ -246,6 +249,9 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 int read(int fd, void *buffer, unsigned size)
 {
    check_valid_buffer(buffer, size, true);
+   // check_valid_buffer(buffer, size+1, true);
+   if (!fd)
+      return -1;
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -286,6 +292,8 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 int write(int fd, const void *buffer, unsigned size)
 {
    check_valid_buffer(buffer, size, false);
+   // check_valid_buffer(buffer, size+1, false);
+
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -294,7 +302,7 @@ int write(int fd, const void *buffer, unsigned size)
    }
    else if (fd == STDIN_FILENO)
    {
-      exit(-1);
+      return -1;
    }
    else
    {
@@ -347,39 +355,50 @@ void close(int fd)
    process_close_file(fd);
    return file_close(close_file);
 }
+
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
+{
+   // check_address(addr);
+   if (!addr || length <= 0 || pg_ofs(addr) != 0 || addr < 0 || addr >= KERN_BASE)
+      return NULL;
+   if (!fd || fd < 2 || fd > 128)
+      return NULL;
+   if (length > UINT_MAX || offset > PGSIZE)
+      return NULL;
+   struct file *file = process_get_file(fd);
+   if (!file)
+      return NULL;
+   if (file_length(file) < length)
+      return do_mmap(addr, file_length(file), writable, file, offset);
+   else
+      return do_mmap(addr, length, writable, file, offset);
+}
+
+
+void munmap(void *addr)
+{
+   do_munmap(addr);
+}
+
 /*
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
-#ifdef VM
-struct page * check_address(void *addr)
+
+struct page *check_address(void *addr)
 {
+   if (!addr)
+      exit(-1);
    struct thread *curr = thread_current();
    struct page *page = spt_find_page(&curr->spt, addr);
-   if (!addr || is_kernel_vaddr(addr) ||!page)
+   if (is_kernel_vaddr(addr))
    {
-      return NULL;
+      return -1;
    }
    return page;
 }
 
-void check_valid_buffer(void *buffer, unsigned size, bool to_write)
-{
-   for (unsigned int i = 0; i <= size; i++)
-   {
-      struct page *page = check_address(buffer + i);
-      if(page == NULL){
-         exit(-1);
-      }
-      if(to_write == false && page->writable == false){
-         exit(-1);
-      }
-   }
-}
-
-
-#else
-void check_address(void *addr)
+void check_address_not_vm(void *addr)
 {
    struct thread *curr = thread_current();
    if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
@@ -387,4 +406,20 @@ void check_address(void *addr)
       exit(-1);
    }
 }
-#endif
+void check_valid_buffer(void *buffer, unsigned size, bool to_write)
+{
+   for (char i = 0; i <= size; i++)
+   {
+      struct page *page = check_address(buffer + i);
+      if (page == NULL)
+      {
+         return -1;
+         // exit(-1);
+      }
+      if (to_write == true && page->writable == false)
+      {
+         // return -1;
+         exit(-1);
+      }
+   }
+}
