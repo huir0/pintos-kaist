@@ -6,4 +6,7 @@ vm/file.o: ../../vm/file.c ../../include/vm/vm.h \
  ../../include/vm/file.h ../../include/filesys/file.h \
  ../../include/filesys/off_t.h ../../include/threads/thread.h \
  ../../include/lib/debug.h ../../include/lib/kernel/list.h \
- ../../include/threads/interrupt.h ../../include/threads/synch.h
+ ../../include/threads/interrupt.h ../../include/threads/synch.h \
+ ../../include/userprog/process.h ../../include/threads/vaddr.h \
+ ../../include/threads/loader.h ../../include/threads/mmu.h \
+ ../../include/threads/pte.h

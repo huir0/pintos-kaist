@@ -5,8 +5,12 @@
 
 struct page;
 enum vm_type;
-
+/* 추가 */
 struct file_page {
+	int mapid;
+	struct file* file;
+	struct list_elem elem;
+	struct list vme_list;
 };
 
 void vm_file_init (void);

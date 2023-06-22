@@ -13,6 +13,14 @@ int process_add_file (struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 void remove_child_process(struct thread *cp);
+
+bool
+lazy_load_segment(struct page *page, void *aux);
+static bool setup_stack(struct intr_frame *if_);
+static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
+                         uint32_t read_bytes, uint32_t zero_bytes,
+                         bool writable);
+
 struct lazy{
 	struct file *file_;
 	off_t offset;

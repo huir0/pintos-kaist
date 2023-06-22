@@ -15,6 +15,7 @@
 #include "threads/synch.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "vm/file.h"
 #include <string.h>
 
 void syscall_entry(void);
@@ -34,14 +35,12 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
-#ifdef VM
-struct page *check_address(void *addr);
+struct page *check_addresss(void *addr);
 void check_valid_buffer(void *buffer, unsigned size, bool to_write);
-#else
 void check_address(void *addr);
-#endif
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
 
 /* System call.
  *
@@ -121,6 +120,11 @@ void syscall_handler(struct intr_frame *f UNUSED)
    case SYS_CLOSE: /* Close a file. */
       close(f->R.rdi);
       break;
+   case SYS_MMAP:
+      f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx,f->R.r10,f->R.r8);
+      break;
+   case SYS_MUNMAP:
+      munmap(f->R.rdi);
    default:
       thread_exit();
    }
@@ -358,27 +362,54 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1))
 */
-#ifdef VM
-struct page *check_address(void *addr)
+struct page *check_addresss(void *addr)
 {
-   if (is_kernel_vaddr(addr) || !addr) exit(-1);
-   struct page *page = spt_find_page(&thread_current()->spt, addr);
-   if (!page) exit(-1);
+
+   if (!addr) exit(-1);
+   struct thread *curr = thread_current();
+   struct page *page = spt_find_page(&curr->spt, addr);
+   if (is_kernel_vaddr(addr)) return -1; 
    return page;
 }
-void check_valid_buffer(void *buffer, unsigned size, bool to_write)
-{
-   for (unsigned int i = 0; i <= size; i++)
-   {
-      struct page *page = check_address(buffer + i);
-      if(to_write == true && page->writable == false) exit(-1);
-   }
-}
-
-#else
 void check_address(void *addr)
-{
+{  
    struct thread *curr = thread_current();
    if (!is_user_vaddr(addr) || is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL) exit(-1);
 }
-#endif
+void check_valid_buffer(void *buffer, unsigned size, bool to_write)
+{
+   for (char i = 0; i <= size; i++)
+   {
+      struct page *page = check_addresss(buffer + i);
+      if(page==NULL) return -1;
+      if(to_write == true && page->writable == false) exit(-1);
+   }
+}
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
+/*우선 시스템콜의 mmap함수는 인자들은 검증해주는 함수로 구현했습니다.
+이후 검증을 성공적으로 통과하면 do_mmap()을 호출하여 실제로 메모리 매핑을 진행합니다.
+첫번째 검증으로 offset의 값이 PGSIZE에 알맞게 align되어 있는지 체크합니다.
+이후 addr의 값이 유효한 주소인지 확인합니다.세부적으로는 해당 주소가 NULL인지,
+해당 주소의 시작점으로 align이 되는지 마지막으로 주소가 커널영역인지 유저영역인지를 확인합니다.
+그 다음으로 파일을 읽어야하는 크기인 length가 0이하인지도 체크해줍니다.
+또한 현재 주소를 가지고 있는 페이지가 SPT에 존재해야하기에 spt-find를 통해 유효한 페이지인지 확인합니다.
+마지막으로 fd값이 표준입력 또는 표준출력인지 확인하고 해당 fd를 통해 가져온 file구조체가 유효한지 검증해줍니다.
+이렇게 다양한 검증을 성공적으로 통과하면 드디어 do_mmap()함수를 호출하여 실제 매모리 매핑을 진행합니다.*/
+   if (offset % PGSIZE ) return NULL;
+   if (!addr || addr == NULL) return NULL;
+   if (is_kernel_vaddr(addr) || pg_round_down(addr) != addr) return NULL;
+   if (length <= 0) return NULL;   
+   struct page *page = spt_find_page(&thread_current()->spt, addr);
+   if (page == NULL) return NULL;   //?
+   if (fd < FD_MIN || fd >= FD_MAX) return NULL;
+   struct file *fd_file = palloc_get_page(fd);
+   if(fd_file == NULL) return NULL;
+
+   return do_mmap(addr,length,writable,fd_file,offset);
+}
+
+void munmap (void *addr){
+   if (is_kernel_vaddr(addr) || !addr) return NULL;
+   return do_munmap(addr);
+}
+
