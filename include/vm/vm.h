@@ -19,9 +19,14 @@ enum vm_type {
 	 * markers, until the value is fit in the int. */
 	VM_MARKER_0 = (1 << 3),
 	VM_MARKER_1 = (1 << 4),
+	VM_MARKER_2 = (1 << 5),
 
 	/* DO NOT EXCEED THIS VALUE. */
 	VM_MARKER_END = (1 << 31),
+	
+	VM_STACK =  (VM_MARKER_0 | VM_ANON),
+	VM_FILE_SWAP = (VM_FILE | VM_MARKER_1),
+	VM_ANON_SWAP = (VM_ANON | VM_MARKER_2),
 };
 
 #include "vm/uninit.h"
@@ -46,6 +51,12 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 	/* Your implementation */
 	bool is_loaded;
+	// struct file *file;
+	// struct list_elem mmap_elem;
+	// off_t offset;
+	// size_t read_bytes;
+	// size_t zero_bytes;
+	// size_t swap_slot;		
 	struct hash_elem elem;
 	bool writable;
 

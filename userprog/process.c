@@ -319,9 +319,7 @@ int process_add_file(struct file *f)
    struct thread *cur = thread_current();
 
    // 파일 객체(struct file)를 가리키는 포인터를 File Descriptor 테이블에 추가
-   lock_acquire(&filesys_lock);
    cur->fdt[cur->next_fd] = f;
-   lock_release(&filesys_lock);
    // 다음 File Descriptor 값 1 증가
    cur->next_fd++;
    // 추가된 파일 객체의 File Descriptor 반환
@@ -379,14 +377,15 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
    struct thread *cur = thread_current();
-   for (int i = 2; i < 64; i++)
+	for (int i = FD_MIN; i < FD_MAX; i++)
       close(i);
+	palloc_free_multiple(cur->fdt, 3);
+	cur->fdt = NULL;
    file_close(cur->running_file);
    sema_up(&cur->exit_sema);
    sema_down(&cur->free_sema);
    process_cleanup(); // pml4를 날림(이 함수를 call 한 thread의 pml4)
 }
-
 /* Free the current process's resources. */
 static void
 process_cleanup(void)
@@ -761,13 +760,13 @@ install_page(void *upage, void *kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment(struct page *page, void *aux)
 {
    /* TODO: Load the segment from the file */
    /* TODO: This called when the first page fault occurs on address VA. */
    /* TODO: VA is available when calling this function. */
-   struct segment *seg = aux;
+   struct segment *seg = (struct segment *)aux;
    struct frame *frame = page->frame;
    if(file_read_at(seg->file, frame->kva, seg->read_bytes, seg->ofs) != (int)seg->read_bytes) {
       palloc_free_page(frame->kva);
@@ -822,7 +821,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
-      ofs = page_read_bytes;
+      ofs += page_read_bytes;
       upage += PGSIZE;
    }
    return true;

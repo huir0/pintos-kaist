@@ -13,15 +13,11 @@ int process_add_file (struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
 void remove_child_process(struct thread *cp);
-#ifdef VM
-static bool lazy_load_segment(struct page *page, void *aux);
-#endif
+bool lazy_load_segment(struct page *page, void *aux);
 struct segment {
     struct file *file;
     off_t ofs;
-    uint8_t *upage;
     uint32_t read_bytes;
     uint32_t zero_bytes;
-    bool writable;
 };
 #endif /* userprog/process.h */
