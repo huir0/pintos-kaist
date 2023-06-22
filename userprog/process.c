@@ -22,7 +22,6 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
-#define VM
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -814,8 +813,7 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       seg->read_bytes = page_read_bytes;
       seg->zero_bytes = page_zero_bytes;
       aux = seg;
-      if (!vm_alloc_page_with_initializer(VM_ANON, upage,
-                                          writable, lazy_load_segment, aux))
+      if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux))
          return false;
 
       /* Advance. */

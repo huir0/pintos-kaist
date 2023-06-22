@@ -16,13 +16,14 @@ void
 vm_init (void) {
 	vm_anon_init ();
 	vm_file_init ();
-	list_init(&frame_list);
+
 #ifdef EFILESYS  /* For project 4 */
 	pagecache_init ();
 #endif
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&frame_list);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -93,6 +94,7 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	page->va = pg_round_down(va); // va의 페이지 시작지점으로 옮긴다.
 	e = hash_find(&spt->hash, &page->elem); // page의 hash_elem 값으로 hash_find 함수를 통해 e를 가져온다.
 	if(e == NULL) {
+		free(page);
 		return NULL;
 	}
 	return hash_entry(e, struct page, elem); // hash_entry 함수로 해당 구조체 (여기선 struct page)로 반환시켜준다. list_entry와 동일한 구조
@@ -181,9 +183,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	if(is_kernel_vaddr(addr) || addr == NULL) {
 		return status;
 	}
-	if(not_present) {
-		
-	}
 	page = spt_find_page(spt, addr); // 1. 보조 페이지 테이블에서 폴트가 발생한 페이지를 찾는다.
 	if(page == NULL) {
 		return status;
@@ -192,8 +191,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		status = vm_do_claim_page (page);
 	}
 	return status;
-	page = spt_find_page(spt, addr); // 1. 보조 페이지 테이블에서 폴트가 발생한 페이지를 찾는다.
-	return vm_do_claim_page(page);
 }
 
 /* Free the page.
@@ -259,13 +256,10 @@ page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNU
 }
 
 void hash_action (struct hash_elem *e, void *aux) {
-	// struct thread *cur = thread_current();
-	// struct page *page = hash_entry(e, struct page, elem);
-	// spt_remove_page(&cur->spt, page);
 	struct page *page = hash_entry(e, struct page, elem);
-	if(page->is_loaded) {
-		vm_dealloc_page(page);
-	}
+	// if(page->is_loaded) {
+	// }
+	vm_dealloc_page(page);
 }
 
 /* Initialize new supplemental page table */
