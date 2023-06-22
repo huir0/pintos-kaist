@@ -236,30 +236,30 @@ vm_do_claim_page (struct page *page) {
 			succ = swap_in(page, frame->kva);
 		}
 	}
-	return false;
+	return succ;
 }
 
 /* Returns a hash value for page p. */
-uint64_t
+unsigned
 page_hash (const struct hash_elem *p_, void *aux UNUSED) {
-	const struct page *p = hash_entry (p_, struct page, elem);
+	struct page *p = hash_entry (p_, struct page, elem);
 	return hash_bytes(&p->va, sizeof(p->va));
 }
 
 /* Returns true if page a precedes page b. */
 bool
 page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED) {
-  const struct page *a = hash_entry (a_, struct page, elem);
-  const struct page *b = hash_entry (b_, struct page, elem);
+  struct page *a = hash_entry (a_, struct page, elem);
+  struct page *b = hash_entry (b_, struct page, elem);
 
   return a->va < b->va;
 }
 
 void hash_action (struct hash_elem *e, void *aux) {
 	struct page *page = hash_entry(e, struct page, elem);
-	// if(page->is_loaded) {
-	// }
-	vm_dealloc_page(page);
+	if(page->is_loaded) {
+		vm_dealloc_page(page);
+	}
 }
 
 /* Initialize new supplemental page table */
