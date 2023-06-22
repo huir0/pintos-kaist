@@ -38,11 +38,8 @@ void close(int fd);
 void check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
-
-#ifdef VM
 struct page *check_page_address(void *addr);
 void check_valid_buffer(void *buffer, unsigned size, bool to_write);
-#endif
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -352,7 +349,6 @@ void close(int fd)
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
-#ifdef VM
 struct page *check_page_address(void *addr) {
    struct thread *cur = thread_current();
    struct page *page = spt_find_page(&cur->spt, addr);
@@ -374,7 +370,6 @@ void check_valid_buffer(void *buffer, unsigned size, bool to_write) {
       }
    }
 }
-#endif
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();

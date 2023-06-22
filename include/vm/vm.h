@@ -45,6 +45,7 @@ struct page {
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
 	/* Your implementation */
+	bool is_loaded;
 	struct hash_elem elem;
 	bool writable;
 
@@ -112,7 +113,7 @@ void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 
-unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
+uint64_t page_hash (const struct hash_elem *p_, void *aux UNUSED);
 bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
 void hash_action (struct hash_elem *e, void *aux);
 #endif  /* VM_VM_H */
