@@ -18,5 +18,19 @@ Executing 'page-merge-stk':
 (page-merge-stk) init
 (page-merge-stk) sort chunk 0
 (page-merge-stk) sort chunk 1
+(page-merge-stk) sort chunk 2
+child-qsort: exit(72)
+(page-merge-stk) sort chunk 3
+child-qsort: exit(72)
+(page-merge-stk) sort chunk 4
+child-qsort: exit(72)
+child-qsort: exit(72)
+(page-merge-stk) sort chunk 5
+(page-merge-stk) sort chunk 6
+child-qsort: exit(72)
+child-qsort: exit(72)
+(page-merge-stk) sort chunk 7
+child-qsort: exit(72)
+(page-merge-stk) wait for child 0
 child-qsort: exit(-1)
 TIMEOUT

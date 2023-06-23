@@ -4,11 +4,11 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 #include "lib/kernel/hash.h"
-#include "include/threads/vaddr.h"
+#include "threads/vaddr.h"
 #include "threads/mmu.h"
-#include "include/userprog/process.h"
+#include "userprog/process.h"
 #include "lib/string.h"
-#include "vm/uninit.h"
+#include "userprog/syscall.h"
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -42,9 +42,7 @@ page_get_type (struct page *page) {
 static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
 static struct frame *vm_evict_frame (void);
-static struct frame *vm_get_frame (void);
-uint64_t vm_hash_func (const struct hash_elem *e,void *aux);
-bool vm_less_func (const struct hash_elem *a, const struct hash_elem *b);
+
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
@@ -63,20 +61,16 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: should modify the field after calling the uninit_new. */
 		/* TODO: Insert the page into the spt. */
 		struct page *uninit = (struct page*)malloc(sizeof(struct page));
-		if (uninit == NULL)
-		{
-			return false;
-		}
-		switch (VM_TYPE(type))
-		{
-		case VM_ANON:
-			uninit_new(uninit, upage, init, type, aux, anon_initializer);
-			break;
-		case VM_FILE:
-			uninit_new(uninit, upage, init, type, aux, file_backed_initializer);
-			break;
-		default:
-			break;
+		if (uninit == NULL) return false;
+		switch (VM_TYPE(type)){
+			case VM_ANON:
+				uninit_new(uninit, upage, init, type, aux, anon_initializer);
+				break;
+			case VM_FILE:
+				uninit_new(uninit, upage, init, type, aux, file_backed_initializer);
+				break;
+			default:
+				break;
 		}
 		uninit->writable = writable;
 		return spt_insert_page(spt, uninit);
@@ -183,23 +177,33 @@ bogus 페이지 폴트가 일어나는 3가지 케이스가 있습니다. 지연
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+	struct supplemental_page_table *spt UNUSED = &thread_current()->spt;
+	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	if (is_kernel_vaddr(addr)||!addr||!not_present) return false;
-	if (not_present){
-		// 커널이면 thread구조체의 rsp_stack을, 유저면 interrupt frame의 rsp를 사용함
-		void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
-		/* 유저 스택영역에 접근하는 경우임, 0x100000 = 2^20 = 1MB 
-			rsp_stack과 한개의 페이지 크기 8사이의 주소에서 page_fault가 났는지, 주소가 유저스택의
-			최대 최소 영역 안에 있는지 */
-		if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK ) vm_stack_growth(addr);
-		struct page *page = spt_find_page(spt, addr);
-		if (page == NULL) return false;
-		if (write == 1 && !page->writable) return false;
-		return vm_do_claim_page (page);
-    }
-	return false;
+
+	if (is_kernel_vaddr(addr))
+		return false;
+
+	if (user)
+	{
+		if ((addr <= USER_STACK) && (addr >= STACK_MAX))
+		{
+			if (addr > f->rsp - PGSIZE)
+				vm_stack_growth(addr);
+			else
+				return false;
+		}
+	}
+	else
+	{
+		if (addr <= USER_STACK && addr >= STACK_MAX)
+		{
+			if (addr > thread_current()->tf.rsp - 8)
+				vm_stack_growth(addr);
+		}
+	}
+	return vm_claim_page(addr);
 }
 /* Free the page.
  * DO NOT MODIFY THIS FUNCTION. */
@@ -211,7 +215,7 @@ vm_dealloc_page (struct page *page) {
 
 /* Claim the page that allocate on VA. */
 bool
-vm_claim_page (void *va UNUSED) {
+vm_claim_page (void *va) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
 	page = spt_find_page(&thread_current()->spt, va);

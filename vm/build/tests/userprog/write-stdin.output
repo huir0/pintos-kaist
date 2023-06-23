@@ -14,7 +14,8 @@ Boot complete.
 Putting 'write-stdin' into the file system...
 Executing 'write-stdin':
 (write-stdin) begin
-write-stdin: exit(-1)
+(write-stdin) end
+write-stdin: exit(0)
 Execution of 'write-stdin' complete.
 Timer: 58 ticks
 Thread: 30 idle ticks, 26 kernel ticks, 2 user ticks
@@ -22,7 +23,7 @@ hd0:0: 0 reads, 0 writes
 hd0:1: 80 reads, 232 writes
 hd1:0: 102 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 946 characters output
+Console: 963 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

@@ -1,2 +1,2 @@
 FAIL
-run: mmap "sample.txt": FAILED
+run: compare read data against written data: FAILED

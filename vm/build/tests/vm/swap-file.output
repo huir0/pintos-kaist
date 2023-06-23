@@ -17,16 +17,21 @@ Executing 'swap-file':
 (swap-file) begin
 (swap-file) open "large.txt"
 (swap-file) mmap "large.txt"
-(swap-file) mmap "large.txt": FAILED
-swap-file: exit(1)
-Execution of 'swap-file' complete.
-Timer: 236 ticks
-Thread: 30 idle ticks, 203 kernel ticks, 3 user ticks
+Kernel PANIC at ../../vm/vm.c:141 in vm_get_frame(): todo
+Call stack: 0x8004217def 0x8004220d7d 0x8004221060 0x8004221041 0x8004220f97 0x800421cc22 0x8004208c4a 0x8004209068 0x4001f3 0x400d85 0x400dce 0Interrupt 0x0d (#GP General Protection Exception) at rip=8004214e29
+ cr2=00000000101ce000 error=               0
+rax 0000800423ef6000 rbx 0000800423e22000 rcx 00000080040b8000 rdx 00000000000003d4
+rsp 000000800423ed50 rbp 000000800423ed60 rsi 000000000000c00f rdi 0000000000000000
+rip 0000008004214e29 r8 000000800423ec68  r9 000000800421b268 r10 0000000000000002
+r11 0000000000000206 r12 0000010423e00000 r13 0000800423e00000 r14 0000800422adf800
+r15 0000800423eef000 rflags 00000006
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC recursion at ../../userprog/exception.c:100 in kill().
+Timer: 317 ticks
+Thread: 30 idle ticks, 206 kernel ticks, 81 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 120 reads, 15900 writes
+hd0:1: 7728 reads, 15900 writes
 hd1:0: 7931 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1089 characters output
-Keyboard: 0 keys pressed
-Exception: 0 page faults
-Powering off...
+Console: 1791 characters output
+Key

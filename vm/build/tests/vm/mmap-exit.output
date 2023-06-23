@@ -19,18 +19,31 @@ Executing 'mmap-exit':
 (child-mm-wrt) create "sample.txt"
 (child-mm-wrt) open "sample.txt"
 (child-mm-wrt) mmap "sample.txt"
-(child-mm-wrt) mmap "sample.txt": FAILED
-child-mm-wrt: exit(1)
-(mmap-exit) wait for child (should return 0): FAILED
+(child-mm-wrt) end
+child-mm-wrt: exit(0)
+(mmap-exit) open "sample.txt" for verification
+(mmap-exit) 512 bytes read starting at offset 0 in "sample.txt" differ from expected.
+(mmap-exit) Showing first differing 64 bytes.
+(mmap-exit) Data actually read:
+0000000000000000  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0000000000000010  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0000000000000020  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+0000000000000030  00 00 00 00 00 00 00 00-00 00 00 00 00 00 00 00 |................|
+(mmap-exit) Expected data:
+0000000000000000  3d 3d 3d 20 20 41 4c 4c-20 55 53 45 52 53 20 50 |===  ALL USERS P|
+0000000000000010  4c 45 41 53 45 20 4e 4f-54 45 20 20 3d 3d 3d 3d |LEASE NOTE  ====|
+0000000000000020  3d 3d 3d 3d 3d 3d 3d 3d-3d 3d 3d 3d 3d 3d 3d 3d |================|
+0000000000000030  3d 3d 3d 3d 0a 0a 43 41-52 20 61 6e 64 20 43 44 |====..CAR and CD|
+(mmap-exit) 512 bytes read starting at offset 0 in "sample.txt" differ from expected: FAILED
 mmap-exit: exit(1)
 Execution of 'mmap-exit' complete.
-Timer: 66 ticks
-Thread: 30 idle ticks, 31 kernel ticks, 5 user ticks
+Timer: 70 ticks
+Thread: 30 idle ticks, 29 kernel ticks, 11 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 224 reads, 472 writes
+hd0:1: 247 reads, 472 writes
 hd1:0: 210 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1235 characters output
+Console: 2172 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

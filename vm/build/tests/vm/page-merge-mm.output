@@ -18,39 +18,40 @@ Executing 'page-merge-mm':
 (page-merge-mm) init
 (page-merge-mm) sort chunk 0
 (page-merge-mm) sort chunk 1
-(child-qsort-mm) mmap "buf0": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) sort chunk 2
-(child-qsort-mm) mmap "buf1": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) sort chunk 3
-(child-qsort-mm) mmap "buf2": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) sort chunk 4
-(child-qsort-mm) mmap "buf3": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) sort chunk 5
-(child-qsort-mm) mmap "buf4": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) sort chunk 6
-(child-qsort-mm) mmap "buf5": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) sort chunk 7
-(child-qsort-mm) mmap "buf6": FAILED
-child-qsort-mm: exit(1)
+child-qsort-mm: exit(80)
 (page-merge-mm) wait for child 0
-(page-merge-mm) wait for child 0: FAILED
+(page-merge-mm) wait for child 1
+(page-merge-mm) wait for child 2
+(page-merge-mm) wait for child 3
+child-qsort-mm: exit(80)
+(page-merge-mm) wait for child 4
+(page-merge-mm) wait for child 5
+(page-merge-mm) wait for child 6
+(page-merge-mm) wait for child 7
+(page-merge-mm) merge
+(page-merge-mm) verify
+(page-merge-mm) bad value 16 in byte 0: FAILED
 page-merge-mm: exit(1)
-(child-qsort-mm) mmap "buf7": FAILED
-child-qsort-mm: exit(1)
 Execution of 'page-merge-mm' complete.
-Timer: 198 ticks
-Thread: 30 idle ticks, 43 kernel ticks, 125 user ticks
+Timer: 310 ticks
+Thread: 30 idle ticks, 42 kernel ticks, 238 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 1204 reads, 4678 writes
+hd0:1: 5230 reads, 4678 writes
 hd1:0: 224 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1850 characters output
+Console: 1844 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

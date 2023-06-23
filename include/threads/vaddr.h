@@ -39,7 +39,8 @@
 유저 가상 메모리는 가상 주소 0부터 KERN_BASE까지. 
 커널 가상 메모리는 가상 주소 공간의 나머지 부분을 차지합니다. */
 #define KERN_BASE LOADER_KERN_BASE
-
+#define MAX_STACK_PAGES 256
+#define STACK_MAX USER_STACK - (PGSIZE * MAX_STACK_PAGES)
 /* User stack start */
 #define USER_STACK 0x47480000
 
