@@ -33,20 +33,20 @@ child-qsort-mm: exit(80)
 child-qsort-mm: exit(80)
 (page-merge-mm) wait for child 0
 (page-merge-mm) wait for child 1
-child-qsort-mm: exit(80)
 (page-merge-mm) wait for child 2
 (page-merge-mm) wait for child 3
 (page-merge-mm) wait for child 4
 (page-merge-mm) wait for child 5
 (page-merge-mm) wait for child 6
 (page-merge-mm) wait for child 7
+child-qsort-mm: exit(80)
 (page-merge-mm) merge
 (page-merge-mm) verify
 (page-merge-mm) bad value 16 in byte 0: FAILED
 page-merge-mm: exit(1)
 Execution of 'page-merge-mm' complete.
 Timer: 307 ticks
-Thread: 30 idle ticks, 45 kernel ticks, 232 user ticks
+Thread: 30 idle ticks, 39 kernel ticks, 238 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 5232 reads, 4678 writes
 hd1:0: 224 reads, 0 writes

@@ -21,8 +21,8 @@ child-linear: exit(66)
 child-linear: exit(66)
 (page-parallel) wait for child 2
 child-linear: exit(66)
-(page-parallel) wait for child 3
 child-linear: exit(66)
+(page-parallel) wait for child 3
 (page-parallel) end
 page-parallel: exit(0)
 Execution of 'page-parallel' complete.
