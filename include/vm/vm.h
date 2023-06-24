@@ -51,15 +51,15 @@ struct page {
 	void *va;              /* Address in terms of user space */
 	struct frame *frame;   /* Back reference for frame */
 	/* Your implementation */
-	bool is_loaded;
+	bool is_loaded; // 물리메모리의 탑재 여부를 알려주는 플래그
 	struct file *file_;
-	struct list_elem mmap_elem;
-	off_t offset;
-	size_t read_bytes;
-	size_t zero_bytes;
+	struct list_elem mmap_elem; // mmap 리스트 element
+	off_t offset; // 읽어야 할 파일 오프셋
+	size_t read_bytes; // 가상페이지에 쓰여져 있는 데이터 크기
+	size_t zero_bytes; // 0으로 채울 남은 페이지의 바이트
 	size_t swap_slot;		
-	struct hash_elem elem;
-	bool writable;
+	struct hash_elem elem; // 해시테이블 element
+	bool writable; // true일 경우 해당 주소에 write 가능, false일 때 불가능
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */

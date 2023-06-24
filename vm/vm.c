@@ -63,20 +63,24 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: should modify the field after calling the uninit_new. */
 		struct page *page = (struct page *)malloc(sizeof(struct page));
 		if(page == NULL) {
+			free(page);
 			goto err;
 		}
+		typedef bool (*page_initializer) (struct page *, enum vm_type, void *kva);
+		page_initializer new_initializer = NULL;
 		switch(VM_TYPE(type)) {
 			case VM_ANON:
-				uninit_new(page, upage, init, type, aux, anon_initializer);
+				new_initializer = anon_initializer;
 				break;
 			case VM_FILE:
-				uninit_new(page, upage, init, type, aux, file_backed_initializer);
+				new_initializer = file_backed_initializer;
 				break;
 			default:
 				break;
 		}
 		/* TODO: Insert the page into the spt. */
 		// uninit_new(page, upage, init, type, aux, new_initializer);
+		uninit_new(page, upage, init, type, aux, file_backed_initializer);
 		page->writable = writable;
 		bool succ = spt_insert_page(spt, page);
 		return succ;
@@ -93,8 +97,8 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct hash_elem *e;
 	page->va = pg_round_down(va); // va의 페이지 시작지점으로 옮긴다.
 	e = hash_find(&spt->hash, &page->elem); // page의 hash_elem 값으로 hash_find 함수를 통해 e를 가져온다.
+	free(page);
 	if(e == NULL) {
-		free(page);
 		return NULL;
 	}
 	return hash_entry(e, struct page, elem); // hash_entry 함수로 해당 구조체 (여기선 struct page)로 반환시켜준다. list_entry와 동일한 구조
@@ -153,6 +157,7 @@ vm_get_frame (void) {
 	if(frame->kva == NULL) { // 할당할 물리메모리가 부족할 경우 프레임과 연결된 페이지 한 개를 swap_out 시키고 사용 가능한 프레임을 가져온다
 		frame = vm_evict_frame();
 		frame->page = NULL;
+		return frame;
 	}
 	list_push_back(&frame_list, &frame->frame_elem); // frame_list에 해당 프레임을 삽입.
 	frame->page = NULL;
@@ -164,6 +169,7 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), true);
 }
 
 /* Handle the fault on write_protected page */
@@ -172,10 +178,17 @@ vm_handle_wp (struct page *page UNUSED) {
 }
 
 /* Return true on success */
+/**
+ * f : 시스템 콜 또는 페이지 폴트가 발생했을 때,그 순간의 레지스터 값들을 담고 있는 구조체.
+ * addr : 페이지 폴트를 일으킨 가상 주소
+ * user : 해당 값이 true일 경우 현재 쓰레드가 유저 모드에서 돌아가다가 페이지 폴트를 일으켰음을 나타낸다.즉,현재 쓰레드의 rsp값이 VM의 유저 영역을 나타내는지 커널 영역을 나타내는지를 알려준다.
+ * write : true일 경우,해당 페이지 폴트가 쓰기 요청이고 그렇지 않을 경우 읽기 요청을 나타냄
+ * not-present : 해당 인자가 false인 경우는 read-only 페이지에 write를 하려는 상황을 나타냄.주어진 테스트 케이스에서는 mmap-ro 케이스가 해당 인자를 체크함
+*/
 bool
-vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
-		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED, bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+	struct thread *cur = thread_current();
+	struct supplemental_page_table *spt UNUSED = &cur->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
@@ -183,16 +196,26 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	if(is_kernel_vaddr(addr) || addr == NULL) {
 		return status;
 	}
-	page = spt_find_page(spt, addr); // 1. 보조 페이지 테이블에서 폴트가 발생한 페이지를 찾는다.
-	if(page == NULL) {
-		return status;
-	}
-	else {
-		status = vm_do_claim_page (page);
+	if(not_present) {	
+		/**
+		 * 가상메모리의 위치가 유저영역일 경우에는 intr_frame에 rsp값이 저장되어 있지만, 
+		 * 커널 영역일 경우에는 유저영역에서의 intr_frame rsp 값을 가져올 수 없기 때문에 
+		 * 현재 스레드에 syscall 발생했을 때 카피한 intr_frame을 가져와서 rsp값을 참조한다.
+		*/
+		void *rsp_stack = user ? f->rsp : cur->tf.rsp;
+		status = vm_claim_page(addr);
+		if(!status) {
+			if(addr >= rsp_stack - 8 && addr >= STACK_MAX && addr <= USER_STACK) {
+				vm_stack_growth(addr);
+				status = true;
+			}
+		}
+		else {
+			status = true;
+		}
 	}
 	return status;
 }
-
 /* Free the page.
  * DO NOT MODIFY THIS FUNCTION. */
 void
@@ -240,6 +263,9 @@ vm_do_claim_page (struct page *page) {
 }
 
 /* Returns a hash value for page p. */
+/**
+ * page 구조체의 va를 이용해 해싱 함수를 돌려 키를 만드는 함수
+*/
 unsigned
 page_hash (const struct hash_elem *p_, void *aux UNUSED) {
 	struct page *p = hash_entry (p_, struct page, elem);
@@ -247,6 +273,9 @@ page_hash (const struct hash_elem *p_, void *aux UNUSED) {
 }
 
 /* Returns true if page a precedes page b. */
+/**
+ * 페이지에서 원하는 값을 리스트에서 서치할 때 사용. 함수에는 va의 대소비교를 하는 내용이 들어 있음.
+*/
 bool
 page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED) {
   struct page *a = hash_entry (a_, struct page, elem);

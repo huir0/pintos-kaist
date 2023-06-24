@@ -146,7 +146,7 @@ page_fault (struct intr_frame *f) {
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
-		return ; // 실패시 exit(-1) 리턴하고 page_fault를 끝낸다.
+		return ;
 #endif
 
 	/* Count page faults. */
@@ -159,6 +159,6 @@ page_fault (struct intr_frame *f) {
 	// 		write ? "writing" : "reading",
 	// 		user ? "user" : "kernel");
 	// kill (f);
-	// exit(-1);
+	exit(-1);
 }
 
