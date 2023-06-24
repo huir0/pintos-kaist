@@ -22,6 +22,7 @@
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
+#include "lib/kernel/hash.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif

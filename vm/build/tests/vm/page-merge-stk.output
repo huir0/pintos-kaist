@@ -18,19 +18,27 @@ Executing 'page-merge-stk':
 (page-merge-stk) init
 (page-merge-stk) sort chunk 0
 (page-merge-stk) sort chunk 1
+child-qsort: exit(72)
 (page-merge-stk) sort chunk 2
-child-qsort: exit(72)
+child-qsort: exit(-1)
 (page-merge-stk) sort chunk 3
-child-qsort: exit(72)
 (page-merge-stk) sort chunk 4
 child-qsort: exit(72)
-child-qsort: exit(72)
 (page-merge-stk) sort chunk 5
-(page-merge-stk) sort chunk 6
 child-qsort: exit(72)
+(page-merge-stk) sort chunk 6
 child-qsort: exit(72)
 (page-merge-stk) sort chunk 7
 child-qsort: exit(72)
-(page-merge-stk) wait for child 0
-child-qsort: exit(-1)
-TIMEOUT
+page-merge-stk: exit(-1)
+Execution of 'page-merge-stk' complete.
+Timer: 239 ticks
+Thread: 30 idle ticks, 41 kernel ticks, 168 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 2499 reads, 5702 writes
+hd1:0: 224 reads, 0 writes
+hd1:1: 0 reads, 0 writes
+Console: 1431 characters output
+Keyboard: 0 keys pressed
+Exception: 2 page faults
+Powering off...

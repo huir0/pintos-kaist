@@ -355,25 +355,19 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset){
 또한 현재 주소를 가지고 있는 페이지가 SPT에 존재해야하기에 spt-find를 통해 유효한 페이지인지 확인합니다.
 마지막으로 fd값이 표준입력 또는 표준출력인지 확인하고 해당 fd를 통해 가져온 file구조체가 유효한지 검증해줍니다.
 이렇게 다양한 검증을 성공적으로 통과하면 드디어 do_mmap()함수를 호출하여 실제 매모리 매핑을 진행합니다.*/
-   if (!addr || length <= 0 || pg_ofs(addr) != 0 || addr < 0 || addr >= KERN_BASE)
-      return NULL;
-   if (!fd || fd < 2 || fd > 128)
-      return NULL;
-   if (length > 4294967295U || offset > PGSIZE)
-      return NULL;
+   if (offset % PGSIZE) return NULL;
+   if (!addr  || pg_ofs(addr) != 0 || addr < 0 || is_kernel_vaddr(addr)) return NULL;
+   if (!fd || fd < 2 || fd > 128) return NULL;
+   if (length > UINT_MAX || length <= 0) return NULL;
    struct file *file = process_get_file(fd);
-   if (!file)
-      return NULL;
+   if (!file) return NULL;
 
-	if (file_length(file) < length)
-      return do_mmap(addr, file_length(file), writable, file, offset);
-   else
-      return do_mmap(addr, length, writable, file, offset);
+	if (file_length(file) < length) return do_mmap(addr, file_length(file), writable, file, offset);
+   else return do_mmap(addr, length, writable, file, offset);
 
 }
 
 void munmap (void *addr){
-   
    do_munmap(addr);
 }
 

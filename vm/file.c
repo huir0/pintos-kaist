@@ -113,6 +113,7 @@ do_mmap()은 이와 달리 FILE 타입으로 인자를 넘겨줘야한다는것�
 		f_length -= page_read_bytes;
 		addr += PGSIZE;
 		offset += page_read_bytes; 
+		
 	}
 	return origin_addr;
 }
@@ -133,11 +134,15 @@ do_munmap (void *addr) {
 이는 논리적인 허점이 있으니 mmap()에서 페이지의 넘버링을 통해 페이지의 시퀀스를 저장한다음 해당 시퀀스를 iter의 종료조건으로 넣어주시는것도 좋은 방법입니다.
 (그 외 다양한 방법이 존재하는것 같습니다)*/
 	struct thread *curr = thread_current();
-	struct page *page = spt_find_page(&curr->spt, addr);
-	if(page == NULL) return NULL;	
-	struct lazy *c_page = page;
-	if(c_page->file_ == NULL) return NULL;
-	while(page != NULL){
+	while(true){
+		struct page *page = spt_find_page(&curr->spt, addr);
+		if(page == NULL) return NULL;	
+		struct lazy *c_page = page->uninit.aux;
+		if(c_page->file_ == NULL) return NULL;
+
+		page = spt_find_page(&curr->spt,addr);
+		// if(page->frame->kva != addr) return NULL;/
+		
 		if(pml4_is_dirty(curr->pml4,addr)){
 			lock_acquire(&filesys_lock);
 			file_write_at(c_page->file_, addr, c_page->read_bytes,c_page->offset);
@@ -145,7 +150,8 @@ do_munmap (void *addr) {
 			pml4_set_dirty(curr->pml4,addr,false);
 		}
 		pml4_clear_page(curr->pml4,addr);
+		if(page->frame) page->frame = NULL;
 		addr += PGSIZE;
-		page = spt_find_page(&curr->spt,addr);
 	}	
+	
 }

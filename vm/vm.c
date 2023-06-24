@@ -181,29 +181,60 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+	// if (is_kernel_vaddr(addr)||!addr||!not_present) return false;
+	// if (not_present && user){
+	// 	// 커널이면 thread구조체의 rsp_stack을, 유저면 interrupt frame의 rsp를 사용함
+	// 	void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
+	// 	/* 유저 스택영역에 접근하는 경우임, 0x100000 = 2^20 = 1MB 
+	// 		rsp_stack과 한개의 페이지 크기 8사이의 주소에서 page_fault가 났는지, 주소가 유저스택의
+	// 		최대 최소 영역 안에 있는지 */
+	// 	if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK && addr >= STACK_MAX ) 
+	// 		if (addr > f->rsp - PGSIZE) vm_stack_growth(addr);
+	// 		else return false;
+	// 	struct page *page = spt_find_page(spt, addr);
+	// 	if (page == NULL) return false;
+	// 	if (write == 1 && !page->writable) return false;
+	// 	return vm_do_claim_page (page);
+    // }
+	// return vm_claim_page(page);
+	// if (!addr || is_kernel_vaddr(addr)) return false;
 
-	if (is_kernel_vaddr(addr))
-		return false;
+	// if (is_kernel_vaddr(addr))
+	// 	return false;
+	// if (user){
+	// 	if ((addr <= USER_STACK) && (addr >= STACK_MAX)) {
+	// 		if (addr > f->rsp - PGSIZE)
+	// 			vm_stack_growth(addr);
+	// 		else
+	// 			return false;
+	// 	}
+	// }
+	// else
+	// {
+	// 	if (addr <= USER_STACK && addr >= STACK_MAX)
+	// 	{
+	// 		if (addr > thread_current()->tf.rsp - 8)
+	// 			vm_stack_growth(addr);
+	// 	}
+	// }
+	// return vm_claim_page(addr);
 
-	if (user)
-	{
-		if ((addr <= USER_STACK) && (addr >= STACK_MAX))
-		{
-			if (addr > f->rsp - PGSIZE)
-				vm_stack_growth(addr);
-			else
-				return false;
-		}
-	}
-	else
-	{
-		if (addr <= USER_STACK && addr >= STACK_MAX)
-		{
-			if (addr > thread_current()->tf.rsp - 8)
-				vm_stack_growth(addr);
-		}
-	}
-	return vm_claim_page(addr);
+	if (!addr || is_kernel_vaddr(addr)) return false;
+	if (not_present){
+		// 커널이면 thread구조체의 rsp_stack을, 유저면 interrupt frame의 rsp를 사용함
+		void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->tf.rsp : f->rsp;
+		/* 유저 스택영역에 접근하는 경우임, 0x100000 = 2^20 = 1MB 
+			rsp_stack과 한개의 페이지 크기 8사이의 주소에서 page_fault가 났는지, 주소가 유저스택의
+			최대 최소 영역 안에 있는지 */
+		if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK && addr >= STACK_MAX)
+			if( addr > rsp_stack - PGSIZE) vm_stack_growth(addr);
+			else return false;
+		struct page *page = spt_find_page(spt, addr);
+		if (page == NULL) return false;
+		if (write == 1 && !page->writable) return false;
+		return vm_do_claim_page (page);
+    }
+	return false;
 }
 /* Free the page.
  * DO NOT MODIFY THIS FUNCTION. */

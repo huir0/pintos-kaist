@@ -1,0 +1,4 @@
+usage: pintos [-h] [-v] [-k] [-T TIMEOUT] [-m MEMORY] [--fs-disk FS_DISK]
+              [--swap-disk SWAP_DISK] [-p HOSTFNS] [-g GUESTFNS] [--mnts MNTS]
+              [--gdb] [-t]
+pintos: error: unrecognized arguments: pintos
