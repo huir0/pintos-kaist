@@ -1,16 +1,15 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-#define VM
-#define USERPROG
+
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/synch.h"
-#define VM
 #ifdef VM
 #include "vm/vm.h"
 #endif
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -119,7 +118,7 @@ struct thread
    int exit_flag; // 스레드 종료 확인을 위한 플래그
 
    struct file *running_file;
-   // void *stack_bottom_;
+
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
 
@@ -130,6 +129,7 @@ struct thread
 #ifdef VM
    /* Table for whole virtual memory owned by thread. */
    struct supplemental_page_table spt;
+   void * stack_bottom;
 #endif
 
    /* Owned by thread.c. */

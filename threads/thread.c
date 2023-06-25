@@ -114,7 +114,7 @@ void thread_init(void)
    list_init(&ready_list);
    list_init(&sleep_list);
    list_init(&destruction_req);
-   
+
    /* Set up a thread structure for the running thread. */
    initial_thread = running_thread();
    init_thread(initial_thread, "main", PRI_DEFAULT);
@@ -404,7 +404,7 @@ void test_max_priority(void)
    //    ready_list에서 우선 순위가 가장 높은 쓰레드와 현재 쓰레드의 우선 순위를
    // 비교.
    //  현재 쓰레드의 우선수위가 더 작다면 thread_yield()
-   if (list_entry(ready_list.head.next, struct thread, elem)->priority > thread_get_priority())
+   if (list_entry(ready_list.head.next, struct thread, elem)->priority > thread_get_priority() && !intr_context())
    {
       thread_yield();
    }
