@@ -9,6 +9,10 @@
 #include "include/userprog/process.h"
 #include "lib/string.h"
 #include "userprog/syscall.h"
+#include "threads/palloc.h"
+#include "lib/kernel/bitmap.h"
+
+// struct bitmap *swap_table;
 struct list *frame_table;
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -123,9 +127,16 @@ vm_get_victim(void)
 {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
-	victim = list_pop_front(&frame_table);
-
+	// struct list_elem *e = list_back(&frame_table);
+struct list_elem *e = list_pop_back(&frame_table);
+	// while (e)
+	// {
+	victim = list_entry(e, struct frame, f_elem);
+	// list_remove(e);
 	return victim;
+	// }
+
+	// return false;
 }
 
 /* Evict one page and return the corresponding frame.
@@ -135,7 +146,22 @@ vm_evict_frame(void)
 {
 	struct frame *victim UNUSED = vm_get_victim();
 	/* TODO: swap out the victim and return the evicted frame. */
-	swap_out(victim->page);
+	if (!victim)
+		return false;
+	// switch (page_get_type(victim->page))
+	// {
+	// case VM_UNINIT:
+	if (page_get_type(victim->page) == VM_UNINIT)
+	{
+
+		if (pml4_is_dirty(thread_current()->pml4, victim->page->va))
+			swap_out(victim->page);
+		victim->page->uninit.type = VM_ANON_SWAP;
+	}
+	else
+	{
+		swap_out(victim->page);
+	}
 	return victim;
 }
 
@@ -153,7 +179,6 @@ vm_get_frame(void)
 	if (frame->kva == NULL)
 	{
 		frame->page = NULL;
-		// PANIC("todo");
 		frame = vm_evict_frame();
 	}
 	list_push_back(&frame_table, &frame->f_elem);
@@ -169,6 +194,7 @@ vm_stack_growth(void *addr UNUSED)
 {
 	/* Increases the stack size by allocating one or more anonymous pages so that addr is no longer a faulted address.
 	Make sure you round down the addr to PGSIZE when handling the allocation. */
+
 	vm_alloc_page(VM_STACK, pg_round_down(addr), 1);
 }
 
@@ -219,6 +245,7 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED, bool us
 				vm_stack_growth(addr);
 		}
 	}
+
 	return vm_claim_page(addr);
 }
 /* Free the page.
@@ -257,7 +284,7 @@ vm_do_claim_page(struct page *page)
 	if (pml4_get_page(thread_current()->pml4, page->va) == NULL && pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable))
 	{
 		page->is_loaded = true;
-		return swap_in(page, frame->kva);
+		return swap_in(frame->page, frame->kva);
 	}
 	return false;
 }
@@ -301,8 +328,8 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, st
 	while (hash_next(&i))
 	{
 		struct page *page = hash_entry(hash_cur(&i), struct page, elem);
-		struct segment *seg = (struct segment *)page->uninit.aux;
-
+		// struct segment *seg = (struct segment *)page->uninit.aux;
+		// 타입별로 나눠서 uninit만 with_initializer, anon은 바로 swap_in??
 		if (!vm_alloc_page_with_initializer(page_get_type(page), page->va, page->writable, page->uninit.init, page->uninit.aux))
 			return false;
 
@@ -315,6 +342,8 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, st
 			memcpy(new_page->frame->kva, page->frame->kva, PGSIZE);
 		}
 	}
+
+	// above for uninit type
 	return true;
 }
 

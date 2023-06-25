@@ -4,7 +4,7 @@
 #include "filesys/file.h"
 #include "threads/mmu.h"
 #include "userprog/process.h"
-static bool file_backed_swap_in(struct page *page, void *kva);
+bool file_backed_swap_in(struct page *page, void *kva);
 static bool file_backed_swap_out(struct page *page);
 static void file_backed_destroy(struct page *page);
 
@@ -31,10 +31,14 @@ bool file_backed_initializer(struct page *page, enum vm_type type, void *kva)
 }
 
 /* Swap in the page by read contents from the file. */
-static bool
-file_backed_swap_in(struct page *page, void *kva)
+bool file_backed_swap_in(struct page *page, void *kva)
 {
 	struct file_page *file_page UNUSED = &page->file;
+
+	// size_t length = file_length(page->_file);
+	do_mmap(kva, page->read_bytes, page->writable, page->_file, page->offset);
+	return true;
+	// return file_read_at(page->_file, kva, page->read_bytes, page->offset);
 }
 
 /* Swap out the page by writeback contents to the file. */
@@ -42,6 +46,15 @@ static bool
 file_backed_swap_out(struct page *page)
 {
 	struct file_page *file_page UNUSED = &page->file;
+	uint64_t *pml4 = thread_current()->pml4;
+
+	if (pml4_is_dirty(pml4, page->va))
+	{
+		file_write_at(page->_file, page->va, page->read_bytes, page->offset);
+		pml4_set_dirty(pml4, page->va, 0);
+		pml4_clear_page(pml4, page->va);
+	}
+	return true;
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
@@ -68,10 +81,10 @@ do_mmap(void *addr, size_t length, int writable, struct file *file, off_t offset
 
 	void *addr_ = addr;
 
-	size_t read_bytes = length;
+	struct file *_file = file_reopen(file);
+	size_t read_bytes = length < file_length(_file) ? length : file_length(_file);
 	// if (spt_find_page(&thread_current()->spt, addr)) return -1;
 	// struct file *_file = file_duplicate(file);
-	struct file *_file = file_reopen(file);
 	while (read_bytes > 0)
 	{
 		struct segment *seg = (struct segment *)malloc(sizeof(struct segment));
@@ -80,10 +93,11 @@ do_mmap(void *addr, size_t length, int writable, struct file *file, off_t offset
 		seg->file_ = _file;
 		seg->ofs = offset;
 		seg->read_bytes = page_read_bytes;
-		seg->zero_bytes = PGSIZE - page_read_bytes;
+		seg->zero_bytes = PGSIZE - page_read_bytes; //?
 		if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, seg))
 		{
 			// free(seg);
+			free(_file);
 			return NULL;
 		}
 		read_bytes -= page_read_bytes;
@@ -110,11 +124,10 @@ mmap()을 통해 저희는 파일 타입이 FILE인 UNINIT페이지를 생성했
 void do_munmap(void *addr)
 {
 	uint64_t *pml4 = thread_current()->pml4;
-	
+
 	while (true)
 	{
 		struct page *page = spt_find_page(&thread_current()->spt, addr);
-
 		if (!page)
 			return false;
 		if (pml4_is_dirty(pml4, addr))
@@ -123,6 +136,7 @@ void do_munmap(void *addr)
 			pml4_set_dirty(pml4, addr, 0);
 		}
 		pml4_clear_page(pml4, addr);
+		// spt_remove_page(&thread_current()->spt, addr);
 		addr += PGSIZE;
 	}
 }

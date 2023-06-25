@@ -349,7 +349,7 @@ init_pool (struct pool *p, void **bm_base, uint64_t start, uint64_t end) {
 
 /* Returns true if PAGE was allocated from POOL,
    false otherwise. */
-static bool
+bool
 page_from_pool (const struct pool *pool, void *page) {
 	size_t page_no = pg_no (page);
 	size_t start_page = pg_no (pool->base);

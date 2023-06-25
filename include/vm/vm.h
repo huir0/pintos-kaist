@@ -21,7 +21,7 @@ enum vm_type {
 	VM_MARKER_1 = (1 << 4),
 	VM_MARKER_2 = (1 << 5),
 	
-	VM_STACK =  (VM_MARKER_0 | VM_ANON),
+	VM_STACK =  (VM_ANON | VM_MARKER_0),
 	VM_FILE_SWAP = (VM_FILE | VM_MARKER_1),
 	VM_ANON_SWAP = (VM_ANON | VM_MARKER_2),
 	
@@ -61,7 +61,6 @@ struct page {
 	size_t swap_slot;
 	struct hash_elem elem;
 	bool writable;
-
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {

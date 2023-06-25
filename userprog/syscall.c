@@ -362,8 +362,11 @@ void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
    if (!addr || length <= 0 || pg_ofs(addr) != 0 || addr < 0 || addr >= KERN_BASE)
       return NULL;
    if (!fd || fd < 2 || fd > 128)
-      return NULL;
+      // return NULL;
+      exit(-1);
    if (length > UINT_MAX || offset > PGSIZE)
+      return NULL;
+   if (offset % PGSIZE != 0 || pg_round_down(addr) != addr)
       return NULL;
    struct file *file = process_get_file(fd);
    if (!file)
@@ -373,7 +376,6 @@ void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
    else
       return do_mmap(addr, length, writable, file, offset);
 }
-
 
 void munmap(void *addr)
 {
