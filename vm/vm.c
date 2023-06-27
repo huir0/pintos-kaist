@@ -91,12 +91,11 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = (struct page *)malloc(sizeof(struct page));
+	struct page page;
 	/* TODO: Fill this function. */
 	struct hash_elem *e;
-	page->va = pg_round_down(va); // va의 페이지 시작지점으로 옮긴다.
-	e = hash_find(&spt->hash, &page->elem); // page의 hash_elem 값으로 hash_find 함수를 통해 e를 가져온다.
-	free(page);
+	page.va = pg_round_down(va); // va의 페이지 시작지점으로 옮긴다.
+	e = hash_find(&spt->hash, &page.elem); // page의 hash_elem 값으로 hash_find 함수를 통해 e를 가져온다.
 	if(e == NULL) {
 		return NULL;
 	}
