@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
+#include "threads/mmu.h"
+#include "userprog/syscall.h"
+
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,

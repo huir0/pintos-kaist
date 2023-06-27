@@ -79,8 +79,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 				break;
 		}
 		/* TODO: Insert the page into the spt. */
-		// uninit_new(page, upage, init, type, aux, new_initializer);
-		uninit_new(page, upage, init, type, aux, file_backed_initializer);
+		uninit_new(page, upage, init, type, aux, new_initializer);
 		page->writable = writable;
 		bool succ = spt_insert_page(spt, page);
 		return succ;
@@ -169,7 +168,18 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
-	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), true);
+	struct thread *cur = thread_current();
+	bool status;
+	status = vm_alloc_page(VM_ANON, addr, true);
+	if(status) {
+		cur->stack_bottom -= PGSIZE;
+	}
+	addr = pg_round_down(addr);
+	while(addr < cur->stack_bottom) {
+		status = vm_alloc_page(VM_ANON, addr, true);
+		vm_claim_page(addr);
+		addr += PGSIZE;
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -193,26 +203,21 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED, bool user U
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	bool status = false;
-	if(is_kernel_vaddr(addr) || addr == NULL) {
+	if(is_kernel_vaddr(addr) || addr == NULL || !not_present) {
 		return status;
 	}
-	if(not_present) {	
-		/**
-		 * 가상메모리의 위치가 유저영역일 경우에는 intr_frame에 rsp값이 저장되어 있지만, 
-		 * 커널 영역일 경우에는 유저영역에서의 intr_frame rsp 값을 가져올 수 없기 때문에 
-		 * 현재 스레드에 syscall 발생했을 때 카피한 intr_frame을 가져와서 rsp값을 참조한다.
-		*/
-		void *rsp_stack = user ? f->rsp : cur->tf.rsp;
-		status = vm_claim_page(addr);
-		if(!status) {
-			if(addr >= rsp_stack - 8 && addr >= STACK_MAX && addr <= USER_STACK) {
-				vm_stack_growth(addr);
-				status = true;
-			}
-		}
-		else {
+	page = spt_find_page(spt, addr);
+	if(page == NULL){
+		if(addr >= f->rsp - 8 && addr >= STACK_MAX && addr <= USER_STACK) {
+			vm_stack_growth(addr);
+			cur->stack_bottom = pg_round_down(addr);
 			status = true;
+			return status;
 		}
+	}
+	else {
+		status = vm_do_claim_page(page);
+		return status;
 	}
 	return status;
 }
@@ -309,7 +314,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
    	hash_first(&i, &src->hash);
    	while (e = hash_next(&i)) {
 		parent_page = hash_entry(e, struct page, elem); // 부모 페이지를 src_hash에서 가져오기
-		status = vm_alloc_page_with_initializer(parent_page->uninit.type, parent_page->va, parent_page->writable, parent_page->uninit.init, parent_page->uninit.aux);
+		status = vm_alloc_page_with_initializer(page_get_type(parent_page), parent_page->va, parent_page->writable, parent_page->uninit.init, parent_page->uninit.aux);
 		if(!status) {
 			return status;
 		}
