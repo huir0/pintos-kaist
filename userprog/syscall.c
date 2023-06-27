@@ -196,9 +196,7 @@ int exec(const char *cmd_line)
    if (fn_copy == NULL)
       return TID_ERROR;
    strlcpy(fn_copy, cmd_line, PGSIZE);
-   lock_acquire(&filesys_lock);
    tid = process_exec(fn_copy);
-   lock_release(&filesys_lock);
    if (tid == -1)
    {
       return -1;
