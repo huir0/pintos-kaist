@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "threads/interrupt.h"
 #include "threads/synch.h"
+#define USERPROG
+#define VM
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -108,6 +110,9 @@ struct thread
    int next_fd;                 // 테이블 중 비어있는 곳
    struct list child_list;      // 자식 스레드 리스트
    struct list_elem child_elem; // 자식 스레드 리스트를 위한 elem
+   
+   void *rsp_stack;
+   void *stack_bottom;
 
    struct thread *parent; // 부모 스레드
    struct intr_frame parent_if;

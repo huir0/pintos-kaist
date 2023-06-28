@@ -242,7 +242,9 @@ int process_exec(void *f_name)
 
    /* We first kill the current context */
    process_cleanup();
-
+   #ifdef VM
+   supplemental_page_table_init(&cur->spt);
+   #endif
    // for argument parsing
    char *parse[64];
    int count = 0;
@@ -316,9 +318,7 @@ int process_add_file(struct file *f)
    struct thread *cur = thread_current();
 
    // 파일 객체(struct file)를 가리키는 포인터를 File Descriptor 테이블에 추가
-   lock_acquire(&filesys_lock);
    cur->fdt[cur->next_fd] = f;
-   lock_release(&filesys_lock);
    // 다음 File Descriptor 값 1 증가
    cur->next_fd++;
    // 추가된 파일 객체의 File Descriptor 반환
@@ -376,14 +376,15 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
    struct thread *cur = thread_current();
-   for (int i = 2; i < 64; i++)
+	for (int i = FD_MIN; i < FD_MAX; i++)
       close(i);
+	palloc_free_multiple(cur->fdt, 3);
+	cur->fdt = NULL;
    file_close(cur->running_file);
    sema_up(&cur->exit_sema);
    sema_down(&cur->free_sema);
    process_cleanup(); // pml4를 날림(이 함수를 call 한 thread의 pml4)
 }
-
 /* Free the current process's resources. */
 static void
 process_cleanup(void)
@@ -758,12 +759,36 @@ install_page(void *upage, void *kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment(struct page *page, void *aux)
 {
    /* TODO: Load the segment from the file */
    /* TODO: This called when the first page fault occurs on address VA. */
    /* TODO: VA is available when calling this function. */
+
+   struct frame *load_frame = page->frame;
+	struct segment *file_info = (struct segment *)aux;
+
+	struct file *file = ((struct segment *)aux)->file;
+	off_t offset = ((struct segment *)aux)->ofs;
+	size_t page_read_bytes = ((struct segment *)aux)->read_bytes;
+	size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+	uint8_t* kva = page->frame->kva;
+	if (kva == NULL){
+		free(page);
+		return false;
+	}
+	
+	if (file_read_at(file, load_frame->kva, page_read_bytes,offset) != (int)page_read_bytes)
+	{
+		free(page);
+      free(file_info);
+		return false;
+	}
+
+	memset(load_frame->kva + page_read_bytes, 0, page_zero_bytes);
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -797,14 +822,19 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* TODO: Set up aux to pass information to the lazy_load_segment. */
-      void *aux = NULL;
-      if (!vm_alloc_page_with_initializer(VM_ANON, upage,
-                                          writable, lazy_load_segment, aux))
+      struct segment *aux = (struct segment *)malloc(sizeof(struct segment));
+      aux->file = file;
+      aux->ofs = ofs;
+      aux->read_bytes = page_read_bytes;
+      if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux)) {
+         free(aux);
          return false;
+      }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      ofs += page_read_bytes;
       upage += PGSIZE;
    }
    return true;
@@ -816,11 +846,20 @@ setup_stack(struct intr_frame *if_)
 {
    bool success = false;
    void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
-
+   struct thread *cur = thread_current();
    /* TODO: Map the stack on stack_bottom and claim the page immediately.
     * TODO: If success, set the rsp accordingly.
     * TODO: You should mark the page is stack. */
    /* TODO: Your code goes here */
+   success = vm_alloc_page(VM_ANON, stack_bottom, true);
+   if(success) {
+      struct page *page = spt_find_page(&cur->spt, stack_bottom);
+      success = vm_claim_page(stack_bottom);
+      if(success) {
+         if_->rsp = (uintptr_t)USER_STACK;
+         cur->stack_bottom = stack_bottom;
+      }
+   }
 
    return success;
 }

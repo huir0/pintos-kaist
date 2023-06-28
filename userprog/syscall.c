@@ -35,10 +35,13 @@ int write(int fd, const void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
 void check_address(void *addr);
 int process_add_file(struct file *f);
 struct file *process_get_file(int fd);
-
+struct page *check_page_address(void *addr);
+void check_valid_buffer(void *buffer, unsigned size, bool to_write);
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -72,7 +75,6 @@ void syscall_handler(struct intr_frame *f UNUSED)
    // TODO: Your implementation goes here.
    check_address(f->rsp);
    struct thread *cur = thread_current();
-   memcpy(&cur->tf, f, sizeof(struct intr_frame));
    int syscall_num = f->R.rax;
    switch (syscall_num)
    {
@@ -83,6 +85,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
       exit(f->R.rdi);
       break;
    case SYS_FORK: /* Clone current process. */
+      memcpy(&cur->tf, f, sizeof(struct intr_frame));
       f->R.rax = fork(f->R.rdi);
       break;
    case SYS_EXEC: /* Switch current process. */
@@ -118,6 +121,12 @@ void syscall_handler(struct intr_frame *f UNUSED)
    case SYS_CLOSE: /* Close a file. */
       close(f->R.rdi);
       break;
+   case SYS_MMAP:
+      f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+      break;
+   case SYS_MUNMAP:
+      munmap(f->R.rdi);
+      break;      
    default:
       thread_exit();
    }
@@ -242,7 +251,7 @@ buffer 안에 fd 로 열려있는 파일로부터 size 바이트를 읽습니다
 */
 int read(int fd, void *buffer, unsigned size)
 {
-   check_address(buffer);
+   check_valid_buffer(buffer, size, true);
    int file_size;
    char *read_buffer = buffer;
    if (fd == 0)
@@ -282,6 +291,7 @@ buffer로부터 open file fd로 size 바이트를 적어줍니다.
 */
 int write(int fd, const void *buffer, unsigned size)
 {
+   check_valid_buffer(buffer, size, false);
    int file_size;
    if (fd == STDOUT_FILENO)
    {
@@ -294,8 +304,12 @@ int write(int fd, const void *buffer, unsigned size)
    }
    else
    {
+      struct file *read_file = process_get_file(fd);
+      if(read_file == NULL) {
+         return -1;
+      }
       lock_acquire(&filesys_lock);
-      file_size = file_write(process_get_file(fd), buffer, size);
+      file_size = file_write(read_file, buffer, size);
       lock_release(&filesys_lock);
    }
    return file_size;
@@ -343,10 +357,68 @@ void close(int fd)
    process_close_file(fd);
    return file_close(close_file);
 }
+/**
+ * mmap은 메모리를 페이지 단위로 할당받는 시스템 콜이다.
+*/
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+   // 시작 주소의 위치가 page-alined가 안되었을 때,
+   if(offset % PGSIZE != 0) {
+      return NULL;
+   }
+   // addr이 page-alined가 안되었거나, 커널영역에 있거나 addr이 NULL이거나 length가 0일 때,
+   if(pg_round_down(addr) != addr || is_kernel_vaddr(addr) || addr == NULL || length <= 0) {
+      return NULL;
+   }
+   struct thread *cur = thread_current();
+   // addr위치에 기존의 페이지가 존재할 때,
+   if(spt_find_page(&cur->spt, pg_round_down(addr))) {
+      return NULL;
+   }
+   // fd값이 표준입출력일때,
+   if(fd < 2 || fd > 128) {
+      exit(-1);
+   }
+   // 불러온 파일이 올바르지 않을 때 NULL 반환
+   struct file *read_file = process_get_file(fd);
+   if(read_file == NULL) {
+      return NULL;
+   }
+   return do_mmap(addr, length, writable, read_file, offset);
+}
+void munmap (void *addr) {
+   if(is_kernel_vaddr(addr) || !addr) {
+      exit(-1);
+   }
+   do_munmap(addr);
+}
 /*
 주소 값이 유저 영역 주소 값인지 확인
 유저 영역을 벗어난 영역일 경우 프로세스 종료(exit(-1)
 */
+struct page *check_page_address(void *addr) {
+   if(!addr) {
+      exit(-1);
+   }
+   struct thread *cur = thread_current();
+   struct page *page = spt_find_page(&cur->spt, addr);
+   if(is_kernel_vaddr(addr)) {
+      return -1;
+   }
+   return page;
+}
+
+void check_valid_buffer(void *buffer, unsigned size, bool to_write) {
+   for (unsigned int i = 0; i <= size; i++)
+   {
+      struct page *page = check_page_address(buffer + i);
+      if(page == NULL){
+         return -1;
+      }
+      if(to_write == false && page->writable == false){
+         exit(-1);
+      }
+   }
+}
 void check_address(void *addr)
 {
    struct thread *curr = thread_current();

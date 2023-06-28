@@ -217,9 +217,9 @@ tid_t thread_create(const char *name, int priority,
 
    list_push_back(&thread_current()->child_list, &t->child_elem);
    /* compare the priorities of the currently running thread and the newly inserted one. Yield the CPU if the newly arriving thread has higher priority*/
-   if (thread_get_priority() < t->priority)
-   {
-      thread_yield();
+   if (thread_get_priority() < t->priority){
+      if(!intr_context())
+         thread_yield();
    }
 
    return tid;
